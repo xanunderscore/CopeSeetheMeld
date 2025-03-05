@@ -1,0 +1,11 @@
+{
+  "Author": "xan",
+  "Name": "Cope, Seethe, Meld",
+  "Punchline": "Auto melding",
+  "Description": "(Over)melds for you - coping and seething optional.",
+  "ApplicableVersion": "any",
+  "Tags": [
+    "melding",
+    "automation"
+  ]
+}
