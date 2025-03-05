@@ -1,6 +1,5 @@
 using FFXIVClientStructs.FFXIV.Client.Game;
 using Lumina.Excel.Sheets;
-using SamplePlugin;
 using System.Collections.Generic;
 
 namespace CopeSeetheMeld;

@@ -15,7 +15,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
-namespace SamplePlugin.Windows;
+namespace CopeSeetheMeld.Windows;
 
 public partial class MainWindow : Window, IDisposable
 {

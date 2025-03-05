@@ -1,5 +1,4 @@
 using FFXIVClientStructs.FFXIV.Client.Game;
-using SamplePlugin;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -22,8 +21,14 @@ public static class Meld
 
         foreach (var (itemSlot, item) in goal)
         {
-            if (item.GearsetItem.Id == 0 || item.Source is not Gearsets.InventoryLocation loc)
+            if (item.GearsetItem.Id == 0)
                 continue;
+
+            if (item.Source is not Gearsets.InventoryLocation loc)
+            {
+                Messages.Add($"No {Plugin.ItemName(item.GearsetItem.Id)} found in inventory, skipping");
+                continue;
+            }
 
             var materiaSlot = 0;
             foreach (var (want, have) in item.GearsetItem.Materia.Zip(item.Materia))
@@ -90,6 +95,5 @@ public static class Meld
 
     private static void DoRetrieve(TaskRetrieve t)
     {
-
     }
 }
