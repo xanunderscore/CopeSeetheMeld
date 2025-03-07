@@ -1,8 +1,8 @@
 {
   "Author": "xan",
   "Name": "Cope, Seethe, Meld",
-  "Punchline": "Auto melding",
-  "Description": "(Over)melds for you",
+  "Punchline": "Why would you make a plugin for something you do once or twice an expansion?",
+  "Description": "Auto melds your gear",
   "ApplicableVersion": "any",
   "Tags": [
     "melding",

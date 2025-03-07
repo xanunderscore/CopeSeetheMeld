@@ -1,11 +1,10 @@
 using Dalamud.Configuration;
-using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json.Serialization;
 
 namespace CopeSeetheMeld;
-
 public enum ItemType
 {
     Weapon,
@@ -23,31 +22,37 @@ public enum ItemType
 }
 
 [Serializable]
-public record struct ItemSlot(uint Id, uint Materia1 = 0, uint Materia2 = 0, uint Materia3 = 0, uint Materia4 = 0, uint Materia5 = 0)
+public class ItemSlot(uint id, uint[]? materia = null)
 {
-
-    [JsonIgnore]
-    public readonly IEnumerable<uint> Materia => [Materia1, Materia2, Materia3, Materia4, Materia5];
+    public readonly uint Id = id;
+    public readonly uint[] Materia = materia ?? new uint[5];
 }
 
 [Serializable]
-public class Gearset : GearsetBase<ItemSlot>;
-
-public class GearsetBase<TItem> where TItem : struct
+public class Gearset(string name)
 {
-    public required string Name;
-    [JsonProperty]
-    private Dictionary<ItemType, TItem> items { get; init; } = [];
+    public readonly string Name = name;
+    public readonly ItemSlot[] Items = Enumerable.Repeat(new ItemSlot(0), 12).ToArray();
 
-    public TItem this[ItemType ty]
+    public ItemSlot this[ItemType index]
     {
-        get { return items.GetValueOrDefault(ty); }
-        set { items[ty] = value; }
+        get => Items[(int)index];
+        set => Items[(int)index] = value;
     }
 
-    public Dictionary<ItemType, TItem>.Enumerator GetEnumerator() => items.GetEnumerator();
-    public GearsetBase<TItem2> Map<TItem2>(Func<TItem, TItem2> f) where TItem2 : struct =>
-        new() { Name = Name, items = items.ToDictionary(k => k.Key, k => f(k.Value)) };
+    [JsonIgnore]
+    public IEnumerable<(ItemType, ItemSlot)> Slots
+    {
+        get
+        {
+            for (var i = 0; i < 12; i++)
+            {
+                var it = Items[i];
+                if (it.Id > 0)
+                    yield return ((ItemType)i, it);
+            }
+        }
+    }
 }
 
 [Serializable]

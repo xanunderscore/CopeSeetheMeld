@@ -1,7 +1,7 @@
-using CopeSeetheMeld;
 using Dalamud.Interface;
 using Dalamud.Interface.Textures.TextureWraps;
 using Dalamud.Interface.Utility;
+using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
 using ImGuiNET;
 using Lumina.Excel.Sheets;
@@ -12,27 +12,26 @@ using System.Linq;
 using System.Net.Http;
 using System.Numerics;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace CopeSeetheMeld.Windows;
 
 public partial class MainWindow : Window, IDisposable
 {
-    private Plugin plugin;
-    private Configuration Config => plugin.Configuration;
+    private Configuration Config => Plugin.Config;
     private Task? importTask = null;
     private readonly HttpClient httpClient;
     private string message = "";
     private readonly JsonSerializerOptions jop = new() { IncludeFields = true };
+    private Automation auto = new();
 
-    private GearsetBase<Gearsets.ItemStatus>? gearsetDetail = null;
+    private Gearset? gearsetDetail = null;
 
     private readonly UldWrapper materiaUld;
 
     private readonly ReadOnlyCollection<IDalamudTextureWrap?> materiaIcons;
 
-    public MainWindow(Plugin plugin)
+    public MainWindow()
         : base("CSM", ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse)
     {
         SizeConstraints = new WindowSizeConstraints
@@ -41,7 +40,6 @@ public partial class MainWindow : Window, IDisposable
             MaximumSize = new Vector2(float.MaxValue, float.MaxValue)
         };
 
-        this.plugin = plugin;
 
         httpClient = new();
 
@@ -56,24 +54,20 @@ public partial class MainWindow : Window, IDisposable
 
     public override void Draw()
     {
+        using (ImRaii.Disabled(!auto.Running))
+            if (ImGui.Button("Stop current task"))
+                auto.Stop();
+        ImGui.SameLine();
+        ImGui.TextUnformatted($"Status: {auto.CurrentTask?.Status ?? "idle"}");
+
         if (ImGui.Button("Import from clipboard"))
-            DoImport(ImGui.GetClipboardText());
+        {
+            Plugin.Log.Debug($"importing {ImGui.GetClipboardText()}");
+            auto.Start(new Import(ImGui.GetClipboardText()));
+        }
 
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("Teamcraft/Etro URL");
-
-        if (importTask?.IsCompleted ?? false)
-        {
-            if (importTask.IsFaulted)
-                message = importTask.Exception.Message;
-            else if (importTask.IsCanceled)
-                message = "Import canceled.";
-            else
-            {
-                message = "";
-                importTask = null;
-            }
-        }
 
         ImGui.SameLine();
         if (ImGui.Button("Delete all"))
@@ -81,9 +75,6 @@ public partial class MainWindow : Window, IDisposable
             Config.Gearsets.Clear();
             Config.SelectedGearset = null;
         }
-
-        if (message != "")
-            ImGui.Text(message);
 
         if (ImGui.BeginChild("Left", new Vector2(150 * ImGuiHelpers.GlobalScale, -1), false))
         {
@@ -149,25 +140,7 @@ public partial class MainWindow : Window, IDisposable
         ImGui.EndTable();
 
         if (ImGui.Button("Meld it!"))
-            Meld.Start(Gearsets.Check(gs));
-
-        foreach (var m in Meld.Messages)
-            ImGui.Text(m);
-    }
-
-    [GeneratedRegex(@"https?:\/\/etro\.gg\/gearset\/([^/]+)", RegexOptions.IgnoreCase, "en-US")]
-    private static partial Regex Etro();
-
-    private void DoImport(string text)
-    {
-        var m = Etro().Match(text);
-        if (m.Success)
-        {
-            importTask = DoEtroImport(m.Groups[1].Value);
-            return;
-        }
-
-        message = "Unrecognized URL or JSON";
+            auto.Start(new ProcessGearset(gs));
     }
 
     public class EtroGearset
@@ -198,7 +171,7 @@ public partial class MainWindow : Window, IDisposable
         if (gs == null)
             throw new Exception("Unexpected response from Etro API");
 
-        var newgs = new Gearset() { Name = gs.name };
+        var newgs = new Gearset(gs.name);
 
         newgs[ItemType.Weapon] = EtroToItem(gs, gs.weapon);
         newgs[ItemType.Head] = EtroToItem(gs, gs.head);
@@ -220,9 +193,9 @@ public partial class MainWindow : Window, IDisposable
     internal static ItemSlot EtroToItem(EtroGearset egs, uint? itemId, string keyExtra = "")
     {
         if (itemId == null)
-            return new ItemSlot() { Id = 0 };
+            return new(0);
 
-        var slot = new ItemSlot() { Id = itemId.Value };
+        var slot = new ItemSlot(itemId.Value);
 
         var materiaSlotKey = $"{itemId}{keyExtra}";
 
@@ -233,19 +206,19 @@ public partial class MainWindow : Window, IDisposable
                 switch (k)
                 {
                     case "1":
-                        slot.Materia1 = id;
+                        slot.Materia[0] = id;
                         break;
                     case "2":
-                        slot.Materia2 = id;
+                        slot.Materia[1] = id;
                         break;
                     case "3":
-                        slot.Materia3 = id;
+                        slot.Materia[2] = id;
                         break;
                     case "4":
-                        slot.Materia4 = id;
+                        slot.Materia[3] = id;
                         break;
                     case "5":
-                        slot.Materia5 = id;
+                        slot.Materia[4] = id;
                         break;
                 }
             }
@@ -258,11 +231,12 @@ public partial class MainWindow : Window, IDisposable
     {
         ImGui.TableNextColumn();
 
-        if (slot.Id == 0 || Plugin.Item(slot.Id) is not Item it)
+        if (slot.Id == 0)
         {
             ImGui.TableNextColumn();
             return;
         }
+        var it = slot.Id.ItemRow();
 
         var maxSlots = it.MateriaSlotCount;
 
