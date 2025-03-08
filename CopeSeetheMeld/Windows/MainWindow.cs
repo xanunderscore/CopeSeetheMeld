@@ -9,26 +9,15 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
-using System.Net.Http;
 using System.Numerics;
-using System.Text.Json;
-using System.Threading.Tasks;
 
 namespace CopeSeetheMeld.Windows;
 
 public partial class MainWindow : Window, IDisposable
 {
-    private Configuration Config => Plugin.Config;
-    private Task? importTask = null;
-    private readonly HttpClient httpClient;
-    private string message = "";
-    private readonly JsonSerializerOptions jop = new() { IncludeFields = true };
-    private Automation auto = new();
-
-    private Gearset? gearsetDetail = null;
-
+    private static Configuration Config => Plugin.Config;
+    private readonly Automation auto = new();
     private readonly UldWrapper materiaUld;
-
     private readonly ReadOnlyCollection<IDalamudTextureWrap?> materiaIcons;
 
     public MainWindow()
@@ -40,9 +29,6 @@ public partial class MainWindow : Window, IDisposable
             MaximumSize = new Vector2(float.MaxValue, float.MaxValue)
         };
 
-
-        httpClient = new();
-
         materiaUld = Plugin.PluginInterface.UiBuilder.LoadUld("ui/uld/ItemDetail.uld");
         int[] iconParts = [6, 5, 4, 3, 21, 23, 25, 27, 29, 31, 33, 35];
         int[] iconOvermeldParts = [20, 19, 18, 17, 22, 24, 26, 28, 30, 32, 34, 36];
@@ -50,7 +36,16 @@ public partial class MainWindow : Window, IDisposable
         materiaIcons = Enumerable.Concat(iconParts, iconOvermeldParts).Select(p => materiaUld.LoadTexturePart("ui/uld/ItemDetail_hr1.tex", p)).ToList().AsReadOnly();
     }
 
-    public void Dispose() { }
+    public void Dispose()
+    {
+        auto.Dispose();
+        materiaUld.Dispose();
+        foreach (var item in materiaIcons)
+        {
+            item?.Dispose();
+        }
+        GC.SuppressFinalize(this);
+    }
 
     public override void Draw()
     {
@@ -60,51 +55,61 @@ public partial class MainWindow : Window, IDisposable
         ImGui.SameLine();
         ImGui.TextUnformatted($"Status: {auto.CurrentTask?.Status ?? "idle"}");
 
+        var ctrl = ImGui.GetIO().KeyCtrl;
+
         if (ImGui.Button("Import from clipboard"))
         {
             Plugin.Log.Debug($"importing {ImGui.GetClipboardText()}");
             auto.Start(new Import(ImGui.GetClipboardText()));
         }
 
-        if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Teamcraft/Etro URL");
-
         ImGui.SameLine();
-        if (ImGui.Button("Delete all"))
-        {
-            Config.Gearsets.Clear();
-            Config.SelectedGearset = null;
-        }
+        using (ImRaii.PushFont(UiBuilder.IconFont))
+            ImGui.TextUnformatted(FontAwesomeIcon.InfoCircle.ToIconString());
+
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip($"xivgear.app URL, etro.gg URL, or Teamcraft \"Copy gearset to clipboard\"");
+
+        using (ImRaii.Disabled(!ctrl))
+            if (ImGui.Button("Delete all"))
+            {
+                Config.Gearsets.Clear();
+                Config.SelectedGearset = null;
+            }
 
         ImGui.Spacing();
         ImGui.Separator();
         ImGui.Spacing();
 
-        if (ImGui.BeginChild("Left", new Vector2(150 * ImGuiHelpers.GlobalScale, -1), false))
-        {
+        using (ImRaii.Child("Left", new Vector2(150 * ImGuiHelpers.GlobalScale, -1)))
             DrawSidebar();
-            ImGui.EndChild();
-        }
 
         ImGui.SameLine();
 
-        if (ImGui.BeginChild("Right", new Vector2(-1, -1), false, ImGuiWindowFlags.NoSavedSettings))
-        {
+        using (ImRaii.Child("Right", new Vector2(-1, -1), false, ImGuiWindowFlags.NoSavedSettings))
             if (Config.SelectedGearset is string s && Config.Gearsets.TryGetValue(s, out var gearset))
                 DrawGearset(gearset);
-            ImGui.EndChild();
-        }
     }
 
-    private void DrawSidebar()
+    private static void DrawSidebar()
     {
         foreach (var g in Config.Gearsets.Keys)
             if (ImGui.Selectable(g, g == Config.SelectedGearset))
-                Config.SelectedGearset = g;
+                Config.SelectedGearset = Config.SelectedGearset == g ? null : g;
     }
 
     private void DrawGearset(Gearset gs)
     {
+        var rename = gs.Name;
+        if (ImGui.InputText("Name", ref rename, 255, ImGuiInputTextFlags.EnterReturnsTrue))
+        {
+            var oldName = gs.Name;
+            gs.Name = rename;
+            Config.Gearsets.Add(rename, gs);
+            Config.Gearsets.Remove(oldName);
+            Config.SelectedGearset = rename;
+        }
+
         if (ImGui.Button("Delete"))
         {
             Config.Gearsets.Remove(gs.Name);
@@ -118,28 +123,28 @@ public partial class MainWindow : Window, IDisposable
         ImGui.TableSetupColumn("###textright");
 
         ImGui.TableNextRow(ImGuiTableRowFlags.None, 80);
-        DrawEquip(gs[ItemType.Weapon]);
-        DrawEquip(gs[ItemType.Offhand]);
+        DrawItemSlot(gs[ItemType.Weapon]);
+        DrawItemSlot(gs[ItemType.Offhand]);
 
         ImGui.TableNextRow(ImGuiTableRowFlags.None, 80);
-        DrawEquip(gs[ItemType.Head]);
-        DrawEquip(gs[ItemType.Ears]);
+        DrawItemSlot(gs[ItemType.Head]);
+        DrawItemSlot(gs[ItemType.Ears]);
 
         ImGui.TableNextRow(ImGuiTableRowFlags.None, 80);
-        DrawEquip(gs[ItemType.Body]);
-        DrawEquip(gs[ItemType.Neck]);
+        DrawItemSlot(gs[ItemType.Body]);
+        DrawItemSlot(gs[ItemType.Neck]);
 
         ImGui.TableNextRow(ImGuiTableRowFlags.None, 80);
-        DrawEquip(gs[ItemType.Hands]);
-        DrawEquip(gs[ItemType.Wrists]);
+        DrawItemSlot(gs[ItemType.Hands]);
+        DrawItemSlot(gs[ItemType.Wrists]);
 
         ImGui.TableNextRow(ImGuiTableRowFlags.None, 80);
-        DrawEquip(gs[ItemType.Legs]);
-        DrawEquip(gs[ItemType.RingL]);
+        DrawItemSlot(gs[ItemType.Legs]);
+        DrawItemSlot(gs[ItemType.RingL]);
 
         ImGui.TableNextRow(ImGuiTableRowFlags.None, 80);
-        DrawEquip(gs[ItemType.Feet]);
-        DrawEquip(gs[ItemType.RingR]);
+        DrawItemSlot(gs[ItemType.Feet]);
+        DrawItemSlot(gs[ItemType.RingR]);
 
         ImGui.EndTable();
 
@@ -147,25 +152,7 @@ public partial class MainWindow : Window, IDisposable
             auto.Start(new ProcessGearset(gs));
     }
 
-    public class EtroGearset
-    {
-        public required string name;
-        public required Dictionary<string, Dictionary<string, uint>> materia;
-        public uint? weapon;
-        public uint? head;
-        public uint? body;
-        public uint? hands;
-        public uint? legs;
-        public uint? feet;
-        public uint? offHand;
-        public uint? ears;
-        public uint? neck;
-        public uint? wrists;
-        public uint? fingerL;
-        public uint? fingerR;
-    }
-
-    internal void DrawEquip(ItemSlot slot, int iconSize = 64)
+    private void DrawItemSlot(ItemSlot slot, int iconSize = 64)
     {
         ImGui.TableNextColumn();
 
@@ -193,7 +180,7 @@ public partial class MainWindow : Window, IDisposable
         ImGui.PopStyleVar();
     }
 
-    internal void DrawMateria(uint itemId, bool over)
+    private void DrawMateria(uint itemId, bool over)
     {
         if (itemId == 0)
             return;
@@ -218,13 +205,20 @@ public partial class MainWindow : Window, IDisposable
         }
     }
 
+    private static readonly Dictionary<uint, (Materia Materia, int Grade)> MateriaGradeCache = [];
+
     internal static (Materia Materia, int Grade)? LookupMateria(uint itemId)
     {
+        if (MateriaGradeCache.TryGetValue(itemId, out var cached))
+            return cached;
+
         foreach (var materia in Plugin.DataManager.GameData.GetExcelSheet<Materia>()!.Where(x => x.Item[0].RowId > 0))
         {
             var grade = materia.Item.ToList().FindIndex(y => y.RowId == itemId);
             if (grade >= 0)
-                return (materia, grade);
+            {
+                return MateriaGradeCache[itemId] = (materia, grade);
+            }
         }
 
         return null;

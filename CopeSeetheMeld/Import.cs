@@ -1,5 +1,9 @@
+using Lumina.Excel;
+using Lumina.Excel.Sheets;
+using Lumina.Extensions;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -9,7 +13,7 @@ namespace CopeSeetheMeld;
 
 public partial class Import(string input) : AutoTask
 {
-    private HttpClient client = new();
+    private readonly HttpClient client = new();
     private readonly JsonSerializerOptions jop = new() { IncludeFields = true };
 
     [GeneratedRegex(@"https?:\/\/etro\.gg\/gearset\/([^/]+)", RegexOptions.IgnoreCase, "en-US")]
@@ -23,9 +27,18 @@ public partial class Import(string input) : AutoTask
 
     protected override async Task Execute()
     {
+        // teamcraft export is just markdown
+        if (input.StartsWith("**"))
+        {
+            Status = "Importing from TC";
+            await Task.Run(() => ImportTeamcraft(input));
+            return;
+        }
+
         var m1 = PatternEtro().Match(input);
         if (m1.Success)
         {
+            Status = "Importing from Etro";
             await ImportEtro(m1.Groups[1].Value);
             return;
         }
@@ -33,6 +46,7 @@ public partial class Import(string input) : AutoTask
         var m2 = PatternXIVG().Match(input);
         if (m2.Success)
         {
+            Status = "Importing from xivgear";
             await ImportXIVG(m2.Groups[1].Value);
             return;
         }
@@ -40,6 +54,7 @@ public partial class Import(string input) : AutoTask
         var m3 = PatternXIVGRaw().Match(input);
         if (m3.Success)
         {
+            Status = "Importing from xivgear";
             await ImportXIVG(m3.Groups[1].Value);
             return;
         }
@@ -49,7 +64,6 @@ public partial class Import(string input) : AutoTask
 
     private async Task ImportEtro(string gearsetId)
     {
-        Status = "Importing from Etro.gg";
         Log("Importing from etro");
     }
 
@@ -72,8 +86,6 @@ public partial class Import(string input) : AutoTask
 
     private async Task ImportXIVG(string shortcode)
     {
-        Status = "Importing from XIVGear";
-
         var contents = await client.GetStringAsync($"https://api.xivgear.app/shortlink/{shortcode}");
         var xgs = JsonSerializer.Deserialize<XGSet>(contents, jop) ?? throw new Exception("Bad response from server");
 
@@ -105,5 +117,95 @@ public partial class Import(string input) : AutoTask
         mk(ItemType.RingR, "RingRight");
 
         Plugin.Config.Gearsets.Add(xgs.name, gs);
+    }
+
+    private static void ImportTeamcraft(string markdown)
+    {
+        Dictionary<string, uint> materiaIds = [];
+
+        var name = MakeTeamcraftSetName();
+
+        var gs = Gearset.Create(name);
+
+        var lines = markdown.Split(Environment.NewLine);
+
+        var i = 0;
+        while (true)
+        {
+            var itemName = lines[i].Trim('*');
+            if (itemName.Length == 0)
+                break;
+
+            var hq = false;
+
+            if (itemName.EndsWith(" HQ"))
+            {
+                hq = true;
+                itemName = itemName[..^3];
+            }
+
+            i += 2;
+            List<string> materia = [];
+            while (lines[i].StartsWith('-'))
+            {
+                materia.Add(lines[i][2..]);
+                i++;
+            }
+
+            if (FindItemByName(itemName) is { } matchedRow)
+            {
+                var ty = GetItemEquipType(matchedRow);
+                if (ty == ItemType.Invalid)
+                    continue;
+
+                if (ty == ItemType.RingL && gs[ItemType.RingL].Id != 0)
+                    ty = ItemType.RingR;
+
+                var slot = ItemSlot.Create(matchedRow.RowId, hq);
+                foreach (var (m, ix) in materia.Select((m, i) => (m, i)))
+                {
+                    if (materiaIds.TryGetValue(m, out var id))
+                        slot.Materia[ix] = id;
+                    else if (FindItemByName(m) is { } matchedMateria)
+                    {
+                        materiaIds[m] = matchedMateria.RowId;
+                        slot.Materia[ix] = matchedMateria.RowId;
+                    }
+                }
+                gs[ty] = slot;
+            }
+
+            i++;
+        }
+
+        Plugin.Config.Gearsets.Add(name, gs);
+    }
+
+    private static Item? FindItemByName(string name) => Plugin.DataManager.Excel.GetSheet<Item>().FirstOrNull(i => i.Name == name);
+
+    private static readonly ItemType[] ItemTypesSheetOrder = [ItemType.Weapon, ItemType.Offhand, ItemType.Head, ItemType.Body, ItemType.Hands, ItemType.Invalid, ItemType.Legs, ItemType.Feet, ItemType.Ears, ItemType.Neck, ItemType.Wrists, ItemType.RingL, ItemType.RingR];
+
+    private static ItemType GetItemEquipType(Item it)
+    {
+        var esc = Plugin.DataManager.Excel.GetSheet<RawRow>(null, "EquipSlotCategory").GetRowOrDefault(it.EquipSlotCategory.RowId);
+
+        if (esc != null)
+            for (var i = 0; i < ItemTypesSheetOrder.Length; i++)
+                if (esc.Value.ReadInt8Column(i) == 1)
+                    return ItemTypesSheetOrder[i];
+
+        return ItemType.Invalid;
+    }
+
+    private static string MakeTeamcraftSetName()
+    {
+        if (!Plugin.Config.Gearsets.ContainsKey("Teamcraft Import"))
+            return "Teamcraft Import";
+
+        var i = 1;
+        while (Plugin.Config.Gearsets.ContainsKey($"Teamcraft Import ({i})"))
+            i++;
+
+        return $"Teamcraft Import ({i})";
     }
 }

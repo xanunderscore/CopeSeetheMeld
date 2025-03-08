@@ -5,8 +5,10 @@ using System.Collections.Generic;
 using System.Linq;
 
 namespace CopeSeetheMeld;
+
 public enum ItemType
 {
+    Invalid = -1,
     Weapon,
     Head,
     Body,
@@ -21,14 +23,17 @@ public enum ItemType
     RingR
 }
 
-public class ItemSlot(uint id, IEnumerable<uint> materia)
+public class ItemSlot(uint id, bool hq, IEnumerable<uint> materia)
 {
-    internal ItemSlot() : this(0, []) { }
+    internal ItemSlot() : this(0, false, []) { }
 
-    public static ItemSlot Create(uint id) => new(id, [0, 0, 0, 0, 0]);
+    public static ItemSlot Create(uint id, bool hq = false) => new(id, hq, [0, 0, 0, 0, 0]);
 
     public uint Id = id;
+    public bool HighQuality = hq;
     public List<uint> Materia = materia.ToList();
+
+    public override string ToString() => $"ItemSlot {{ Id = {Id}, HQ = {HighQuality}, Materia = [{string.Join(", ", Materia.TakeWhile(m => m > 0))}] }}";
 }
 
 public class Gearset(string name, IEnumerable<ItemSlot> items)

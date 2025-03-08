@@ -6,6 +6,7 @@ using Dalamud.IoC;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
 using ImGuiNET;
+using Lumina.Excel;
 using Lumina.Excel.Sheets;
 using System.IO;
 
@@ -41,10 +42,7 @@ public sealed class Plugin : IDalamudPlugin
         WindowSystem.AddWindow(MainWindow);
         WindowSystem.AddWindow(MeldWindow);
 
-        CommandManager.AddHandler("/cope", new CommandInfo(OnCope)
-        {
-            HelpMessage = "Meld"
-        });
+        CommandManager.AddHandler("/cope", new CommandInfo(OnCope) { HelpMessage = "Meld" });
         CommandManager.AddHandler("/cmeld", new CommandInfo(OnMeld) { HelpMessage = "Open manual meld window" });
 
         PluginInterface.UiBuilder.Draw += DrawUI;
@@ -67,6 +65,9 @@ public sealed class Plugin : IDalamudPlugin
     private void DrawUI() => WindowSystem.Draw();
 
     public void ToggleMainUI() => MainWindow.Toggle();
+
+    public static ExcelSheet<T> LuminaSheet<T>() where T : struct, IExcelRow<T> => DataManager.Excel.GetSheet<T>();
+    public static T LuminaRow<T>(uint id) where T : struct, IExcelRow<T> => LuminaSheet<T>().GetRow(id);
 }
 
 public static class ItemExtensions

@@ -15,37 +15,37 @@ public abstract class AutoTask
     // debug context scope
     protected readonly struct DebugContext : IDisposable
     {
-        private readonly AutoTask _ctx;
-        private readonly int _depth;
+        private readonly AutoTask ctx;
+        private readonly int depth;
 
         public DebugContext(AutoTask ctx, string name)
         {
-            _ctx = ctx;
-            _depth = _ctx._debugContext.Count;
-            _ctx._debugContext.Add(name);
-            _ctx.Log("Scope enter");
+            this.ctx = ctx;
+            depth = this.ctx.debugContext.Count;
+            this.ctx.debugContext.Add(name);
+            this.ctx.Log("Scope enter");
         }
 
         public void Dispose()
         {
-            _ctx.Log($"Scope exit (depth={_depth}, cur={_ctx._debugContext.Count - 1})");
-            if (_depth < _ctx._debugContext.Count)
-                _ctx._debugContext.RemoveRange(_depth, _ctx._debugContext.Count - _depth);
+            ctx.Log($"Scope exit (depth={depth}, cur={ctx.debugContext.Count - 1})");
+            if (depth < ctx.debugContext.Count)
+                ctx.debugContext.RemoveRange(depth, ctx.debugContext.Count - depth);
         }
 
         public void Rename(string newName)
         {
-            _ctx.Log($"Transition to {newName} @ {_depth}");
-            if (_depth < _ctx._debugContext.Count)
-                _ctx._debugContext[_depth] = newName;
+            ctx.Log($"Transition to {newName} @ {depth}");
+            if (depth < ctx.debugContext.Count)
+                ctx.debugContext[depth] = newName;
         }
     }
 
     public string Status { get; protected set; } = ""; // user-facing status string
-    private readonly CancellationTokenSource _cts = new();
-    private readonly List<string> _debugContext = [];
+    private readonly CancellationTokenSource cts = new();
+    private readonly List<string> debugContext = [];
 
-    public void Cancel() => _cts.Cancel();
+    public void Cancel() => cts.Cancel();
 
     public void Run(Action completed)
     {
@@ -56,17 +56,17 @@ public abstract class AutoTask
             if (task.IsFaulted)
                 Plugin.Log.Warning($"Task ended with error: {task.Exception}");
             completed();
-            _cts.Dispose();
-        }, _cts.Token);
+            cts.Dispose();
+        }, cts.Token);
     }
 
     // implementations are typically expected to be async (coroutines)
     protected abstract Task Execute();
 
-    protected CancellationToken CancelToken => _cts.Token;
+    protected CancellationToken CancelToken => cts.Token;
 
     // wait for a few frames
-    protected Task NextFrame(int numFramesToWait = 1) => Plugin.Framework.DelayTicks(numFramesToWait, _cts.Token);
+    protected Task NextFrame(int numFramesToWait = 1) => Plugin.Framework.DelayTicks(numFramesToWait, cts.Token);
 
     // wait until condition function returns false, checking once every N frames
     protected async Task WaitWhile(Func<bool> condition, string scopeName, int checkFrequency = 1)
@@ -79,7 +79,7 @@ public abstract class AutoTask
         }
     }
 
-    protected void Log(string message) => Plugin.Log.Debug($"[{GetType().Name}] [{string.Join(" > ", _debugContext)}] {message}");
+    protected void Log(string message) => Plugin.Log.Debug($"[{GetType().Name}] [{string.Join(" > ", debugContext)}] {message}");
 
     // start a new debug context; should be disposed, so usually should be assigned to RAII variable
     protected DebugContext BeginScope(string name) => new(this, name);
@@ -88,7 +88,7 @@ public abstract class AutoTask
     protected void Error(string message)
     {
         Log($"Error: {message}");
-        throw new Exception($"[{GetType().Name}] [{string.Join(" > ", _debugContext)}] {message}");
+        throw new Exception($"[{GetType().Name}] [{string.Join(" > ", debugContext)}] {message}");
     }
 
     // abort a task if condition is true
