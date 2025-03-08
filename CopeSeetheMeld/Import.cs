@@ -77,18 +77,18 @@ public partial class Import(string input) : AutoTask
         var contents = await client.GetStringAsync($"https://api.xivgear.app/shortlink/{shortcode}");
         var xgs = JsonSerializer.Deserialize<XGSet>(contents, jop) ?? throw new Exception("Bad response from server");
 
-        var gs = new Gearset(xgs.name);
+        var gs = Gearset.Create(xgs.name);
 
         void mk(ItemType ty, string field)
         {
             if (!xgs.items.TryGetValue(field, out var item))
                 return;
 
-            var mats = new uint[5];
+            var slot = ItemSlot.Create(item.id);
             for (var i = 0; i < Math.Min(5, item.materia.Count); i++)
-                mats[i] = item.materia[i].id;
+                slot.Materia[i] = item.materia[i].id;
 
-            gs[ty] = new ItemSlot(item.id, mats);
+            gs[ty] = slot;
         }
 
         mk(ItemType.Weapon, "Weapon");

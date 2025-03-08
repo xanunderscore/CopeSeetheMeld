@@ -76,6 +76,10 @@ public partial class MainWindow : Window, IDisposable
             Config.SelectedGearset = null;
         }
 
+        ImGui.Spacing();
+        ImGui.Separator();
+        ImGui.Spacing();
+
         if (ImGui.BeginChild("Left", new Vector2(150 * ImGuiHelpers.GlobalScale, -1), false))
         {
             DrawSidebar();
@@ -159,72 +163,6 @@ public partial class MainWindow : Window, IDisposable
         public uint? wrists;
         public uint? fingerL;
         public uint? fingerR;
-    }
-
-    private async Task DoEtroImport(string gearsetId)
-    {
-        message = $"Importing Etro gearset {gearsetId}";
-
-        var contents = await httpClient.GetStringAsync($"https://etro.gg/api/gearsets/{gearsetId}");
-        var gs = JsonSerializer.Deserialize<EtroGearset>(contents, jop);
-
-        if (gs == null)
-            throw new Exception("Unexpected response from Etro API");
-
-        var newgs = new Gearset(gs.name);
-
-        newgs[ItemType.Weapon] = EtroToItem(gs, gs.weapon);
-        newgs[ItemType.Head] = EtroToItem(gs, gs.head);
-        newgs[ItemType.Body] = EtroToItem(gs, gs.body);
-        newgs[ItemType.Hands] = EtroToItem(gs, gs.hands);
-        newgs[ItemType.Legs] = EtroToItem(gs, gs.legs);
-        newgs[ItemType.Feet] = EtroToItem(gs, gs.feet);
-        newgs[ItemType.Offhand] = EtroToItem(gs, gs.offHand);
-        newgs[ItemType.Ears] = EtroToItem(gs, gs.ears);
-        newgs[ItemType.Neck] = EtroToItem(gs, gs.neck);
-        newgs[ItemType.Wrists] = EtroToItem(gs, gs.wrists);
-        newgs[ItemType.RingL] = EtroToItem(gs, gs.fingerL, "L");
-        newgs[ItemType.RingR] = EtroToItem(gs, gs.fingerR, "R");
-
-        Config.Gearsets.Add(newgs.Name, newgs);
-        Config.SelectedGearset = newgs.Name;
-    }
-
-    internal static ItemSlot EtroToItem(EtroGearset egs, uint? itemId, string keyExtra = "")
-    {
-        if (itemId == null)
-            return new(0);
-
-        var slot = new ItemSlot(itemId.Value);
-
-        var materiaSlotKey = $"{itemId}{keyExtra}";
-
-        if (egs.materia.TryGetValue(materiaSlotKey, out var materia))
-        {
-            foreach (var (k, id) in materia)
-            {
-                switch (k)
-                {
-                    case "1":
-                        slot.Materia[0] = id;
-                        break;
-                    case "2":
-                        slot.Materia[1] = id;
-                        break;
-                    case "3":
-                        slot.Materia[2] = id;
-                        break;
-                    case "4":
-                        slot.Materia[3] = id;
-                        break;
-                    case "5":
-                        slot.Materia[4] = id;
-                        break;
-                }
-            }
-        }
-
-        return slot;
     }
 
     internal void DrawEquip(ItemSlot slot, int iconSize = 64)

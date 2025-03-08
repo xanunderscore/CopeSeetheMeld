@@ -6,6 +6,9 @@ MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CopeSeetheMeld", "CopeSeetheMeld\CopeSeetheMeld.csproj", "{A6F57674-1B66-49B7-8EDC-FD8EDE8CAA83}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestBin", "TestBin\TestBin.csproj", "{3414BDEC-80E6-48C0-A24C-8B234836E19A}"
+	ProjectSection(ProjectDependencies) = postProject
+		{A6F57674-1B66-49B7-8EDC-FD8EDE8CAA83} = {A6F57674-1B66-49B7-8EDC-FD8EDE8CAA83}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

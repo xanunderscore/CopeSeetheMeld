@@ -7,6 +7,7 @@ using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
 using ImGuiNET;
 using Lumina.Excel.Sheets;
+using System.IO;
 
 namespace CopeSeetheMeld;
 
@@ -29,7 +30,7 @@ public sealed class Plugin : IDalamudPlugin
 
     public Plugin(IDalamudPluginInterface dalamud, ICommandManager commandManager, ISigScanner sigScanner, IDataManager dataManager, IGameInteropProvider hooking)
     {
-        InteropGenerator.Runtime.Resolver.GetInstance.Setup();
+        InteropGenerator.Runtime.Resolver.GetInstance.Setup(version: File.ReadAllText("ffxivgame.ver"), cacheFile: new(dalamud.ConfigDirectory.FullName + "/cs.json"));
         FFXIVClientStructs.Interop.Generated.Addresses.Register();
         InteropGenerator.Runtime.Resolver.GetInstance.Resolve();
         Config = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();

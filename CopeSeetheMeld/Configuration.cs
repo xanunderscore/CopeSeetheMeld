@@ -1,8 +1,8 @@
 using Dalamud.Configuration;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text.Json.Serialization;
 
 namespace CopeSeetheMeld;
 public enum ItemType
@@ -21,18 +21,24 @@ public enum ItemType
     RingR
 }
 
-[Serializable]
-public class ItemSlot(uint id, uint[]? materia = null)
+public class ItemSlot(uint id, IEnumerable<uint> materia)
 {
-    public readonly uint Id = id;
-    public readonly uint[] Materia = materia ?? new uint[5];
+    internal ItemSlot() : this(0, []) { }
+
+    public static ItemSlot Create(uint id) => new(id, [0, 0, 0, 0, 0]);
+
+    public uint Id = id;
+    public List<uint> Materia = materia.ToList();
 }
 
-[Serializable]
-public class Gearset(string name)
+public class Gearset(string name, IEnumerable<ItemSlot> items)
 {
-    public readonly string Name = name;
-    public readonly ItemSlot[] Items = Enumerable.Repeat(new ItemSlot(0), 12).ToArray();
+    internal Gearset() : this("", []) { }
+
+    public string Name = name;
+    public List<ItemSlot> Items = items.ToList();
+
+    public static Gearset Create(string name) => new(name, Enumerable.Repeat(ItemSlot.Create(0), 12));
 
     public ItemSlot this[ItemType index]
     {
