@@ -1,6 +1,5 @@
 using FFXIVClientStructs.FFXIV.Client.Game;
-using FFXIVClientStructs.Interop;
-using Lumina.Excel.Sheets;
+using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,34 +8,39 @@ using static CopeSeetheMeld.Data;
 
 namespace CopeSeetheMeld;
 
-public class ProcessGearset(Gearset goal) : AutoTask
+public class Meld(Gearset goal, bool doOvermeld = true, bool stopOnMissingItem = false, bool stopOnMissingMateria = false) : AutoCommon
 {
-    private record class FoundItem(Pointer<InventoryItem> Item)
-    {
-        public unsafe uint Slot => Item.Value->GetSlot();
-        public unsafe int SlotCount => Plugin.LuminaRow<Item>(Item.Value->ItemId).MateriaSlotCount;
-        public unsafe int MateriaCount => Item.Value->GetMateriaCount();
-        public unsafe InventoryType Container => Item.Value->GetInventoryType();
-        public static unsafe implicit operator InventoryItem*(FoundItem f) => f.Item.Value;
-
-        public override unsafe string ToString() => $"{Container}/{Slot}";
-    }
+    private readonly bool Overmeld = doOvermeld;
 
     protected override async Task Execute()
     {
-        List<FoundItem> foundItems = [];
+        ErrorIf(Game.PlayerIsBusy, "Can't meld while occupied");
+
+        List<ItemRef> foundItems = [];
         foreach (var (itemSlot, desiredItem) in goal.Slots)
         {
             var currentItem = FindItem(desiredItem, itemSlot, foundItems);
             if (currentItem == null)
             {
-                Log($"Unable to find item for {desiredItem}, skipping");
+                if (stopOnMissingItem)
+                    throw new ItemNotFoundException(desiredItem.Id, desiredItem.HighQuality);
+
                 continue;
             }
 
             foundItems.Add(currentItem);
-            await MeldItem(desiredItem, currentItem);
+            try
+            {
+                await MeldItem(desiredItem, currentItem);
+            }
+            catch (MateriaNotFoundException)
+            {
+                if (stopOnMissingMateria)
+                    throw;
+            }
         }
+
+        unsafe { AgentMateriaAttach.Instance()->Hide(); }
     }
 
     private static IEnumerable<InventoryType> GetUsableInventories(ItemType ty)
@@ -64,7 +68,7 @@ public class ProcessGearset(Gearset goal) : AutoTask
         };
     }
 
-    private static FoundItem? FindItem(ItemSlot slot, ItemType itemType, List<FoundItem> usedSlots)
+    private static ItemRef? FindItem(ItemSlot slot, ItemType itemType, List<ItemRef> usedSlots)
     {
         unsafe
         {
@@ -91,7 +95,7 @@ public class ProcessGearset(Gearset goal) : AutoTask
         return null;
     }
 
-    private List<Mat> GetCurrentMateria(FoundItem item)
+    private List<Mat> GetCurrentMateria(ItemRef item)
     {
         unsafe
         {
@@ -102,7 +106,7 @@ public class ProcessGearset(Gearset goal) : AutoTask
         }
     }
 
-    private async Task MeldItem(ItemSlot want, FoundItem have)
+    private async Task MeldItem(ItemSlot want, ItemRef have)
     {
         var normalSlotCount = have.SlotCount;
 
@@ -129,26 +133,55 @@ public class ProcessGearset(Gearset goal) : AutoTask
             {
                 // retrieve materia until slot is empty
                 await EnsureSlotEmpty(have, i);
-                // do regular melds
-                foreach (var m in wantDict.SelectMany(k => Enumerable.Repeat(k.Key, k.Value)))
-                    await MeldOne(have, m);
                 break;
             }
         }
 
+        // do regular melds
+        foreach (var m in wantDict.SelectMany(k => Enumerable.Repeat(k.Key, k.Value)))
+            await MeldOne(have, m);
+
         // do overmelds
-        foreach (var w in wantMat.Skip(normalSlotCount))
-            await MeldOne(have, w);
+        if (Overmeld)
+        {
+            foreach (var w in wantMat.Skip(normalSlotCount))
+                await MeldOne(have, w);
+        }
+        else
+            Log($"Skipping overmelds for {have}");
     }
 
-    private async Task EnsureSlotEmpty(FoundItem foundItem, int slotIndex)
+    private async Task MeldOne(ItemRef foundItem, Mat m)
     {
-        var cnt = foundItem.MateriaCount;
-        Log($"Removing {Math.Max(0, cnt - slotIndex)} materia from {foundItem}");
+        Status = $"Melding {m} onto {foundItem}";
+
+        await OpenAgent();
+        await SelectItem(foundItem);
+        await SelectMateria(m);
+        await WaitWhile(() => !Game.PlayerIsMelding, "MeldStart");
+        await WaitWhile(() => !Game.IsAddonActive("MateriaAttachDialog"), "AttachDialog");
+
+        unsafe { Game.FireCallback("MateriaAttachDialog", [0, 0, 1], true); }
+
+        await WaitWhile(() => Game.PlayerIsMelding, "MeldFinish", 10);
     }
 
-    private async Task MeldOne(FoundItem foundItem, Mat m)
+    private async Task EnsureSlotEmpty(ItemRef foundItem, int slotIndex)
     {
-        Log($"Melding {m} onto {foundItem}");
+        Status = $"Retrieving from {foundItem}";
+
+        while (foundItem.MateriaCount > slotIndex)
+        {
+            await OpenAgent();
+            await SelectItem(foundItem);
+
+            unsafe { Game.AgentReceiveEvent(&AgentMateriaAttach.Instance()->AgentInterface, 4, [0, 1, 0, 0, 0]); }
+
+            await WaitWhile(() => !Game.IsAddonActive("MateriaRetrieveDialog"), "RetrieveDialog");
+
+            unsafe { Game.FireCallback("MateriaRetrieveDialog", [0], true); }
+
+            await WaitWhile(() => Game.PlayerIsRetrieving, "RetrieveFinish", 10);
+        }
     }
 }

@@ -20,6 +20,7 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] public static IGameInteropProvider Hooking { get; private set; } = null!;
     [PluginService] public static IClientState ClientState { get; private set; } = null!;
     [PluginService] public static IFramework Framework { get; private set; } = null!;
+    [PluginService] public static ICondition Condition { get; private set; } = null!;
 
     public static Configuration Config { get; private set; } = null!;
 
@@ -67,12 +68,3 @@ public sealed class Plugin : IDalamudPlugin
     public static ExcelSheet<T> LuminaSheet<T>() where T : struct, IExcelRow<T> => DataManager.Excel.GetSheet<T>();
     public static T LuminaRow<T>(uint id) where T : struct, IExcelRow<T> => LuminaSheet<T>().GetRow(id);
 }
-
-/*
-public static class ItemExtensions
-{
-    public static Item? ItemRowMaybe(this uint itemId) => Plugin.DataManager.GetExcelSheet<Item>().TryGetRow(itemId, out var row) ? row : null;
-    public static Item ItemRow(this uint itemId) => ItemRowMaybe(itemId)!.Value;
-    public static string ItemName(this uint itemId) => ItemRow(itemId).Name.ToString() ?? "(unknown)";
-}
-*/

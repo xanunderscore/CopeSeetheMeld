@@ -47,7 +47,7 @@ public abstract class AutoTask
 
     public void Cancel() => cts.Cancel();
 
-    public void Run(Action completed)
+    public void Run(Action<AggregateException?> completed)
     {
         Plugin.Framework.Run(async () =>
         {
@@ -55,7 +55,7 @@ public abstract class AutoTask
             await task.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing); // we don't really care about cancelation...
             if (task.IsFaulted)
                 Plugin.Log.Warning($"Task ended with error: {task.Exception}");
-            completed();
+            completed(task.Exception);
             cts.Dispose();
         }, cts.Token);
     }
@@ -103,6 +103,7 @@ public abstract class AutoTask
 public sealed class Automation : IDisposable
 {
     public AutoTask? CurrentTask { get; private set; }
+    public AggregateException? LastError { get; private set; }
 
     public bool Running => CurrentTask != null;
 
@@ -121,8 +122,9 @@ public sealed class Automation : IDisposable
     {
         Stop();
         CurrentTask = task;
-        task.Run(() =>
+        task.Run((exc) =>
         {
+            LastError = exc;
             if (CurrentTask == task)
                 CurrentTask = null;
             // else: some other task is now executing

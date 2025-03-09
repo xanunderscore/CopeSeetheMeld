@@ -145,11 +145,42 @@ public partial class MainWindow : Window, IDisposable
 
         ImGui.EndTable();
 
-        if (ImGui.Button("Meld it!"))
-            auto.Start(new ProcessGearset(gs));
+        using (ImRaii.Disabled(Game.PlayerIsBusy))
+        {
+            DrawSkipOptions("If an item is missing:", ref stopItem);
+            DrawSkipOptions("If materia is missing:", ref stopMateria);
+            ImGui.Checkbox("Perform overmelds", ref overmeld);
+
+            if (ImGui.Button("Meld it!"))
+                auto.Start(new Meld(gs, doOvermeld: overmeld, stopOnMissingItem: stopItem, stopOnMissingMateria: stopMateria));
+
+            if (auto.LastError is { } e)
+                foreach (var inner in e.InnerExceptions)
+                    ImGui.TextUnformatted(inner.Message);
+        }
     }
 
-    private void DrawItemSlot(ItemSlot slot, int iconSize = 64)
+    private bool stopItem = true;
+    private bool stopMateria = true;
+    private bool overmeld = true;
+
+    private static void DrawSkipOptions(string cond, ref bool flag)
+    {
+        ImGui.AlignTextToFramePadding();
+        ImGui.Text(cond);
+        ImGui.SameLine();
+        ImGui.SetNextItemWidth(200);
+        using var comb = ImRaii.Combo($"###{cond}", flag ? "Stop melding" : "Skip it");
+        if (comb)
+        {
+            if (ImGui.Selectable("Stop melding", flag))
+                flag = true;
+            if (ImGui.Selectable("Skip it", !flag))
+                flag = false;
+        }
+    }
+
+    private void DrawItemSlot(ItemSlot slot)
     {
         ImGui.TableNextColumn();
 
