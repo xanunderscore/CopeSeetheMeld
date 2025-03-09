@@ -4,9 +4,7 @@ using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
 using ImGuiNET;
-using Lumina.Excel.Sheets;
 using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Numerics;
@@ -41,9 +39,7 @@ public partial class MainWindow : Window, IDisposable
         auto.Dispose();
         materiaUld.Dispose();
         foreach (var item in materiaIcons)
-        {
             item?.Dispose();
-        }
         GC.SuppressFinalize(this);
     }
 
@@ -110,11 +106,12 @@ public partial class MainWindow : Window, IDisposable
             Config.SelectedGearset = rename;
         }
 
-        if (ImGui.Button("Delete"))
-        {
-            Config.Gearsets.Remove(gs.Name);
-            Config.SelectedGearset = null;
-        }
+        using (ImRaii.Disabled(!ImGui.GetIO().KeyCtrl))
+            if (ImGui.Button("Delete"))
+            {
+                Config.Gearsets.Remove(gs.Name);
+                Config.SelectedGearset = null;
+            }
 
         ImGui.BeginTable("items", 4, ImGuiTableFlags.NoBordersInBody | ImGuiTableFlags.SizingStretchProp);
         ImGui.TableSetupColumn("###iconsleft", ImGuiTableColumnFlags.WidthFixed);
@@ -161,13 +158,11 @@ public partial class MainWindow : Window, IDisposable
             ImGui.TableNextColumn();
             return;
         }
-        var it = slot.Id.ItemRow();
+        var it = Data.Item(slot.Id);
 
         var maxSlots = it.MateriaSlotCount;
 
-        var ic = Plugin.TextureProvider.GetFromGameIcon((uint)it.Icon)?.GetWrapOrEmpty();
-        if (ic != null)
-            ImGui.Image(ic.ImGuiHandle, new(iconSize, iconSize));
+        UI.Draw(it, slot.HighQuality);
 
         ImGui.TableNextColumn();
         ImGui.Text(it.Name.ToString());
@@ -185,11 +180,10 @@ public partial class MainWindow : Window, IDisposable
         if (itemId == 0)
             return;
 
-        var materia = LookupMateria(itemId);
-        if (materia == null)
+        if (!Data.TryGetMateriaById(itemId, out var materia))
             return;
 
-        var grade = materia.Value.Grade;
+        var grade = materia.Grade;
 
         if (over)
             grade += 12;
@@ -199,28 +193,10 @@ public partial class MainWindow : Window, IDisposable
             ImGui.SameLine();
             ImGui.Image(t.ImGuiHandle, new(32, 32));
 
-            var it = Plugin.DataManager.Excel.GetSheet<Item>()?.GetRow(itemId);
-            if (it != null && ImGui.IsItemHovered())
-                ImGui.SetTooltip($"{it.Value.Name} ({materia.Value.Materia.BaseParam.Value!.Name} +{materia.Value.Materia.Value[materia.Value.Grade]})");
-        }
-    }
-
-    private static readonly Dictionary<uint, (Materia Materia, int Grade)> MateriaGradeCache = [];
-
-    internal static (Materia Materia, int Grade)? LookupMateria(uint itemId)
-    {
-        if (MateriaGradeCache.TryGetValue(itemId, out var cached))
-            return cached;
-
-        foreach (var materia in Plugin.DataManager.GameData.GetExcelSheet<Materia>()!.Where(x => x.Item[0].RowId > 0))
-        {
-            var grade = materia.Item.ToList().FindIndex(y => y.RowId == itemId);
-            if (grade >= 0)
+            if (ImGui.IsItemHovered())
             {
-                return MateriaGradeCache[itemId] = (materia, grade);
+                ImGui.SetTooltip($"{Data.ItemName(itemId)} ({materia})");
             }
         }
-
-        return null;
     }
 }

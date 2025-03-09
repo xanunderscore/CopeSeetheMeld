@@ -23,16 +23,16 @@ internal unsafe class MeldWindow : Window
     public override void Draw()
     {
         if (selectedItem != null)
-            DrawFocusedItem(selectedItem, selectedItem->ItemId.ItemRow());
+            DrawFocusedItem(selectedItem, Data.Item(selectedItem->ItemId));
         else
         {
             IterAll(pt =>
             {
                 var item = pt.Value;
-                var row = item->ItemId.ItemRow();
+                var row = Data.Item(item->ItemId);
                 if (CanMeld(item))
                 {
-                    row.Draw();
+                    UI.Draw(row, item->IsHighQuality());
                     if (ImGui.IsItemHovered())
                         ImGui.SetTooltip(row.Name.ToString());
                     if (ImGui.IsItemClicked())
@@ -58,7 +58,7 @@ internal unsafe class MeldWindow : Window
 
     private void DrawFocusedItem(InventoryItem* item, Item row)
     {
-        row.Draw();
+        UI.Draw(row, item->IsHighQuality());
         if (ImGui.IsItemClicked())
         {
             selectedItem = null;
@@ -69,7 +69,7 @@ internal unsafe class MeldWindow : Window
         ImGui.TextUnformatted($"{row.Name}");
 
         if (selectedMateria != null)
-            DrawFocusedMateria(selectedMateria, selectedMateria->ItemId.ItemRow());
+            DrawFocusedMateria(selectedMateria, Data.Item(selectedMateria->ItemId));
         else if (!HasSlots(item))
         {
             if (ImGui.Button("Retrieve"))
@@ -79,11 +79,11 @@ internal unsafe class MeldWindow : Window
             IterAll(pt =>
             {
                 var item = pt.Value;
-                var row = item->ItemId.ItemRow();
+                var row = Data.Item(item->ItemId);
                 if (row.FilterGroup != 13)
                     return;
 
-                row.Draw();
+                UI.Draw(row, item->IsHighQuality());
                 if (ImGui.IsItemHovered())
                     ImGui.SetTooltip(row.Name.ToString());
                 if (ImGui.IsItemClicked())
@@ -94,7 +94,7 @@ internal unsafe class MeldWindow : Window
 
     private void DrawFocusedMateria(InventoryItem* materia, Item row)
     {
-        row.Draw();
+        UI.Draw(row);
         if (ImGui.IsItemClicked())
         {
             selectedMateria = null;
@@ -153,8 +153,8 @@ internal unsafe class MeldWindow : Window
             }
     }
 
-    private static bool HasSlots(InventoryItem* item) => item->GetMateriaCount() < item->ItemId.ItemRow().MateriaSlotCount;
-    private static bool CanMeld(InventoryItem* item) => item->ItemId.ItemRow().MateriaSlotCount > 0;
+    private static bool HasSlots(InventoryItem* item) => item->GetMateriaCount() < Data.Item(item->ItemId).MateriaSlotCount;
+    private static bool CanMeld(InventoryItem* item) => Data.Item(item->ItemId).MateriaSlotCount > 0;
 
     private AtkValue TriggerEvent(AgentMateriaAttach* agent, ulong eventKind, int[] args) => TriggerEvent(&agent->AgentInterface, eventKind, args);
 

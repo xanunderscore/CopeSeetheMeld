@@ -5,9 +5,7 @@ using Dalamud.Interface.Windowing;
 using Dalamud.IoC;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
-using ImGuiNET;
 using Lumina.Excel;
-using Lumina.Excel.Sheets;
 using System.IO;
 
 namespace CopeSeetheMeld;
@@ -70,15 +68,11 @@ public sealed class Plugin : IDalamudPlugin
     public static T LuminaRow<T>(uint id) where T : struct, IExcelRow<T> => LuminaSheet<T>().GetRow(id);
 }
 
+/*
 public static class ItemExtensions
 {
     public static Item? ItemRowMaybe(this uint itemId) => Plugin.DataManager.GetExcelSheet<Item>().TryGetRow(itemId, out var row) ? row : null;
     public static Item ItemRow(this uint itemId) => ItemRowMaybe(itemId)!.Value;
     public static string ItemName(this uint itemId) => ItemRow(itemId).Name.ToString() ?? "(unknown)";
-
-    public static void Draw(this Item item)
-    {
-        var ic = Plugin.TextureProvider.GetFromGameIcon((uint)item.Icon).GetWrapOrEmpty();
-        ImGui.Image(ic.ImGuiHandle, new(64, 64));
-    }
 }
+*/

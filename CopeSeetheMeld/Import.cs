@@ -1,6 +1,5 @@
 using Lumina.Excel;
 using Lumina.Excel.Sheets;
-using Lumina.Extensions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -19,11 +18,8 @@ public partial class Import(string input) : AutoTask
     [GeneratedRegex(@"https?:\/\/etro\.gg\/gearset\/([^/]+)", RegexOptions.IgnoreCase, "en-US")]
     private static partial Regex PatternEtro();
 
-    [GeneratedRegex(@"https?:\/\/xivgear\.app\/\?page=sl%7C([a-zA-Z0-9-]+)", RegexOptions.IgnoreCase, "en-US")]
+    [GeneratedRegex(@"(?:https?:\/\/xivgear\.app\/\?page=sl%7C|https?:\/\/api\.xivgear\.app\/shortlink\/)([a-zA-Z0-9-]+)", RegexOptions.IgnoreCase, "en-US")]
     private static partial Regex PatternXIVG();
-
-    [GeneratedRegex(@"https?:\/\/api\.xivgear\.app\/shortlink\/([a-zA-Z0-9-]+)", RegexOptions.IgnoreCase, "en-US")]
-    private static partial Regex PatternXIVGRaw();
 
     protected override async Task Execute()
     {
@@ -31,7 +27,7 @@ public partial class Import(string input) : AutoTask
         if (input.StartsWith("**"))
         {
             Status = "Importing from TC";
-            await Task.Run(() => ImportTeamcraft(input));
+            ImportTeamcraft(input);
             return;
         }
 
@@ -48,14 +44,6 @@ public partial class Import(string input) : AutoTask
         {
             Status = "Importing from xivgear";
             await ImportXIVG(m2.Groups[1].Value);
-            return;
-        }
-
-        var m3 = PatternXIVGRaw().Match(input);
-        if (m3.Success)
-        {
-            Status = "Importing from xivgear";
-            await ImportXIVG(m3.Groups[1].Value);
             return;
         }
 
@@ -152,7 +140,7 @@ public partial class Import(string input) : AutoTask
                 i++;
             }
 
-            if (FindItemByName(itemName) is { } matchedRow)
+            if (Data.GetItemByName(itemName) is { } matchedRow)
             {
                 var ty = GetItemEquipType(matchedRow);
                 if (ty == ItemType.Invalid)
@@ -164,9 +152,7 @@ public partial class Import(string input) : AutoTask
                 var slot = ItemSlot.Create(matchedRow.RowId, hq);
                 foreach (var (m, ix) in materia.Select((m, i) => (m, i)))
                 {
-                    if (materiaIds.TryGetValue(m, out var id))
-                        slot.Materia[ix] = id;
-                    else if (FindItemByName(m) is { } matchedMateria)
+                    if (Data.GetItemByName(m) is { } matchedMateria)
                     {
                         materiaIds[m] = matchedMateria.RowId;
                         slot.Materia[ix] = matchedMateria.RowId;
@@ -180,8 +166,6 @@ public partial class Import(string input) : AutoTask
 
         Plugin.Config.Gearsets.Add(name, gs);
     }
-
-    private static Item? FindItemByName(string name) => Plugin.DataManager.Excel.GetSheet<Item>().FirstOrNull(i => i.Name == name);
 
     private static readonly ItemType[] ItemTypesSheetOrder = [ItemType.Weapon, ItemType.Offhand, ItemType.Head, ItemType.Body, ItemType.Hands, ItemType.Invalid, ItemType.Legs, ItemType.Feet, ItemType.Ears, ItemType.Neck, ItemType.Wrists, ItemType.RingL, ItemType.RingR];
 
