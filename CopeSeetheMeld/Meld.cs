@@ -1,5 +1,6 @@
 using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.UI.Agent;
+using Lumina.Excel.Sheets;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,33 +15,39 @@ public class Meld(Gearset goal, MeldOptions opts, MeldLog? log) : AutoCommon
     {
         ErrorIf(Game.PlayerIsBusy, "Can't meld while occupied");
 
-        List<ItemRef> foundItems = [];
-        foreach (var (itemSlot, desiredItem) in goal.Slots)
+        try
         {
-            var currentItem = FindItem(desiredItem, itemSlot, foundItems);
-            if (currentItem == null)
-            {
-                if (opts.StopOnMissingItem)
-                    throw new ItemNotFoundException(desiredItem.Id, desiredItem.HighQuality);
 
-                continue;
+            List<ItemRef> foundItems = [];
+            foreach (var (itemSlot, desiredItem) in goal.Slots)
+            {
+                var currentItem = FindItem(desiredItem, itemSlot, foundItems);
+                if (currentItem == null)
+                {
+                    if (opts.StopOnMissingItem)
+                        throw new ItemNotFoundException(desiredItem.Id, desiredItem.HighQuality);
+
+                    continue;
+                }
+
+                foundItems.Add(currentItem);
+                try
+                {
+                    await MeldItem(desiredItem, currentItem);
+                }
+                catch (MateriaNotFoundException)
+                {
+                    if (opts.StopOnMissingMateria)
+                        throw;
+                }
             }
 
-            foundItems.Add(currentItem);
-            try
-            {
-                await MeldItem(desiredItem, currentItem);
-            }
-            catch (MateriaNotFoundException)
-            {
-                if (opts.StopOnMissingMateria)
-                    throw;
-            }
+            log?.Finish();
         }
-
-        log?.Finish();
-
-        unsafe { AgentMateriaAttach.Instance()->Hide(); }
+        finally
+        {
+            unsafe { AgentMateriaAttach.Instance()->Hide(); }
+        }
     }
 
     private static IEnumerable<InventoryType> GetUsableInventories(ItemType ty)
@@ -108,7 +115,38 @@ public class Meld(Gearset goal, MeldOptions opts, MeldLog? log) : AutoCommon
 
     private async Task MeldItem(ItemSlot want, ItemRef have)
     {
-        var normalSlotCount = have.SlotCount;
+        var shouldContinue = await MeldNormal(want, have);
+        if (!shouldContinue)
+            return;
+
+        var normalSlotCount = have.NormalSlotCount;
+
+        var wantMat = want.Materia.TakeWhile(m => m > 0).Select(m => GetMateriaById(m)!).ToList();
+        var haveMat = GetCurrentMateria(have).ToList();
+
+        for (var slot = normalSlotCount; slot < wantMat.Count; slot++)
+        {
+            var curMateria = have.GetMateria(slot);
+            var wantMateria = wantMat[slot];
+
+            if (curMateria != wantMateria)
+            {
+                if (!opts.Overmeld)
+                {
+                    Log($"Skipping overmelds for {have}");
+                    return;
+                }
+                if (curMateria.Id != 0)
+                    await EnsureSlotEmpty(have, slot);
+
+                await MeldOne(have, wantMateria, slot - normalSlotCount);
+            }
+        }
+    }
+
+    private async Task<bool> MeldNormal(ItemSlot want, ItemRef have)
+    {
+        var normalSlotCount = have.NormalSlotCount;
 
         var wantMat = want.Materia.TakeWhile(m => m > 0).Select(m => GetMateriaById(m)!);
         var haveMat = GetCurrentMateria(have);
@@ -134,7 +172,7 @@ public class Meld(Gearset goal, MeldOptions opts, MeldLog? log) : AutoCommon
                 if (opts.Mode == MeldOptions.SpecialMode.MeldOnly)
                 {
                     Log($"Retrieval needed for slot {i}");
-                    return;
+                    return false;
                 }
 
                 // retrieve materia until slot is empty
@@ -146,26 +184,26 @@ public class Meld(Gearset goal, MeldOptions opts, MeldLog? log) : AutoCommon
         if (opts.Mode == MeldOptions.SpecialMode.RetrieveOnly)
         {
             Log($"Done with retrievals, exiting");
-            return;
+            return false;
         }
 
         // do regular melds
         foreach (var m in wantDict.SelectMany(k => Enumerable.Repeat(k.Key, k.Value)))
             await MeldOne(have, m);
 
-        // do overmelds
-        if (opts.Overmeld)
-        {
-            foreach (var w in wantMat.Skip(normalSlotCount))
-                await MeldOne(have, w);
-        }
-        else if (wantMat.Skip(normalSlotCount).Any())
-            Log($"Skipping overmelds for {have}");
+        return true;
     }
 
-    private async Task MeldOne(ItemRef foundItem, Mat m)
+    private async Task MeldOne(ItemRef foundItem, Mat m, int overmeldSlot = -1)
     {
         Status = $"Melding {m} onto {foundItem}";
+
+        if (overmeldSlot >= 0)
+        {
+            var chanceRow = Plugin.LuminaRow<MateriaGrade>(m.Grade);
+            byte[] chances = foundItem.IsHQ ? [chanceRow.Unknown6, chanceRow.Unknown7, chanceRow.Unknown8, chanceRow.Unknown9] : [chanceRow.Unknown2, chanceRow.Unknown3, chanceRow.Unknown4, chanceRow.Unknown5];
+            Status = $"{Status} ({chances[overmeldSlot]}% success rate)";
+        }
 
         log?.Report(Status);
 
@@ -181,14 +219,22 @@ public class Meld(Gearset goal, MeldOptions opts, MeldLog? log) : AutoCommon
         unsafe { Game.FireCallback("MateriaAttachDialog", [0, 0, 1], true); }
 
         await WaitWhile(() => Game.PlayerIsMelding, "MeldFinish", 10);
+
+        if (overmeldSlot >= 0)
+        {
+            var expectedMat = foundItem.GetMateria(foundItem.NormalSlotCount + overmeldSlot);
+            if (expectedMat != m)
+                throw new MeldFailedException(foundItem, m);
+        }
     }
 
     private async Task EnsureSlotEmpty(ItemRef foundItem, int slotIndex)
     {
-        Status = $"Retrieving {foundItem.MateriaCount - slotIndex} materia from {foundItem}";
+        if (foundItem.MateriaCount <= slotIndex)
+            return;
 
-        if (foundItem.MateriaCount > slotIndex)
-            log?.Report(Status);
+        Status = $"Retrieving {foundItem.MateriaCount - slotIndex} materia from {foundItem}";
+        log?.Report(Status);
 
         if (opts.DryRun)
             return;

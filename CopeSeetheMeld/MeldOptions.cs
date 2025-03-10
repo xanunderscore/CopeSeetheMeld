@@ -30,28 +30,31 @@ public class MeldOptions
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip($"Don't do any melds - just output what changes would be made given current gear.");
 
-        ImGui.AlignTextToFramePadding();
-        ImGui.Text("Mode:");
-        ImGui.SameLine();
-        ImGui.SetNextItemWidth(200);
-        using (var comb = ImRaii.Combo("###mode", ModeString(Mode)))
-        {
-            if (comb)
-            {
-                foreach (var raw in Enum.GetValues(typeof(SpecialMode)))
-                {
-                    var mode = (SpecialMode)raw;
-                    if (ImGui.Selectable(ModeString(mode), Mode == mode))
-                        Mode = mode;
-                }
-            }
-        }
+        EnumCombo("Mode", ModeString, ref Mode);
 
         DrawStopFlag("If an item is missing:", ref StopOnMissingItem);
         using (ImRaii.Disabled(Mode == SpecialMode.RetrieveOnly))
         {
             DrawStopFlag("If materia is missing:", ref StopOnMissingMateria);
             ImGui.Checkbox("Do overmelds", ref Overmeld);
+        }
+    }
+
+    private static void EnumCombo<T>(string label, Func<T, string> display, ref T v) where T : Enum
+    {
+        ImGui.AlignTextToFramePadding();
+        ImGui.Text($"{label}:");
+        ImGui.SameLine();
+        ImGui.SetNextItemWidth(200);
+        using var comb = ImRaii.Combo($"###{label}", display(v));
+        if (comb)
+        {
+            foreach (var raw in Enum.GetValues(typeof(T)))
+            {
+                var opt = (T)raw;
+                if (ImGui.Selectable(display(opt), v.Equals(opt)))
+                    v = opt;
+            }
         }
     }
 
@@ -62,19 +65,18 @@ public class MeldOptions
         _ => "Normal"
     };
 
-
     private static void DrawStopFlag(string cond, ref bool stopFlag)
     {
         ImGui.AlignTextToFramePadding();
         ImGui.Text(cond);
         ImGui.SameLine();
         ImGui.SetNextItemWidth(200);
-        using var comb = ImRaii.Combo($"###{cond}", stopFlag ? "Stop melding" : "Skip item");
+        using var comb = ImRaii.Combo($"###{cond}", stopFlag ? "Stop melding" : "Skip to next item");
         if (comb)
         {
             if (ImGui.Selectable("Stop melding", stopFlag))
                 stopFlag = true;
-            if (ImGui.Selectable("Skip item", !stopFlag))
+            if (ImGui.Selectable("Skip to next item", !stopFlag))
                 stopFlag = false;
         }
     }

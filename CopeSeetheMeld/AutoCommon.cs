@@ -15,17 +15,17 @@ public abstract class AutoCommon : AutoTask
 {
     public class ItemNotFoundException(uint itemId, bool hq) : Exception
     {
-        public readonly uint Id = itemId;
-        public readonly bool HighQuality = hq;
-
         public unsafe ItemNotFoundException(ItemRef i) : this(i.Item.Value->ItemId, i.Item.Value->IsHighQuality()) { }
 
-        public override string Message => $"No {ItemName(Id)} (hq={HighQuality}) in inventory.";
+        public override string Message => $"No {ItemName(itemId)} (hq={hq}) in inventory.";
     }
     public class MateriaNotFoundException(Mat mat) : Exception
     {
-        public readonly Mat Materia = mat;
-        public override string Message => $"No {Materia.Item.Name} in inventory.";
+        public override string Message => $"No {mat.Item.Name} in inventory.";
+    }
+    public class MeldFailedException(ItemRef i, Mat mat) : Exception
+    {
+        public override string Message => $"Ran out of materia while trying to attach {mat} to {i}.";
     }
 
     protected async Task OpenAgent()

@@ -21,10 +21,13 @@ public static class Data
     public record class ItemRef(Pointer<InventoryItem> Item)
     {
         public unsafe uint Slot => Item.Value->GetSlot();
-        public unsafe int SlotCount => Plugin.LuminaRow<Item>(Item.Value->ItemId).MateriaSlotCount;
+        public unsafe int NormalSlotCount => Plugin.LuminaRow<Item>(Item.Value->ItemId).MateriaSlotCount;
         public unsafe int MateriaCount => Item.Value->GetMateriaCount();
+        public unsafe bool IsHQ => Item.Value->IsHighQuality();
         public unsafe InventoryType Container => Item.Value->GetInventoryType();
         public static unsafe implicit operator InventoryItem*(ItemRef f) => f.Item.Value;
+
+        public unsafe Mat GetMateria(int slot) => new(Item.Value->GetMateriaId((byte)slot), Item.Value->GetMateriaGrade((byte)slot));
 
         public override unsafe string ToString() => $"{Container}/{Slot}";
     }
