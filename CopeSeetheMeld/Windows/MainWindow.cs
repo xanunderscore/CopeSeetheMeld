@@ -17,6 +17,7 @@ public partial class MainWindow : Window, IDisposable
     private readonly Automation auto = new();
     private readonly UldWrapper materiaUld;
     private readonly ReadOnlyCollection<IDalamudTextureWrap?> materiaIcons;
+    private readonly MeldOptions meldOptions = new();
 
     public MainWindow()
         : base("CSM", ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse)
@@ -145,40 +146,25 @@ public partial class MainWindow : Window, IDisposable
 
         ImGui.EndTable();
 
+        meldOptions.Draw();
+
         using (ImRaii.Disabled(Game.PlayerIsBusy))
-        {
-            DrawSkipOptions("If an item is missing:", ref stopItem);
-            DrawSkipOptions("If materia is missing:", ref stopMateria);
-            ImGui.Checkbox("Perform overmelds", ref overmeld);
-
             if (ImGui.Button("Meld it!"))
-                auto.Start(new Meld(gs, doOvermeld: overmeld, stopOnMissingItem: stopItem, stopOnMissingMateria: stopMateria));
+            {
+                meldLog = new();
+                auto.Start(new Meld(gs, meldOptions, meldLog));
+            }
 
-            if (auto.LastError is { } e)
-                foreach (var inner in e.InnerExceptions)
-                    ImGui.TextUnformatted(inner.Message);
-        }
+        if (auto.LastError is { } e)
+            foreach (var inner in e.InnerExceptions)
+                ImGui.TextUnformatted(inner.Message);
+
+        if (meldLog is { Done: true, Actions: var actions })
+            foreach (var act in actions)
+                ImGui.TextUnformatted(act);
     }
 
-    private bool stopItem = true;
-    private bool stopMateria = true;
-    private bool overmeld = true;
-
-    private static void DrawSkipOptions(string cond, ref bool flag)
-    {
-        ImGui.AlignTextToFramePadding();
-        ImGui.Text(cond);
-        ImGui.SameLine();
-        ImGui.SetNextItemWidth(200);
-        using var comb = ImRaii.Combo($"###{cond}", flag ? "Stop melding" : "Skip it");
-        if (comb)
-        {
-            if (ImGui.Selectable("Stop melding", flag))
-                flag = true;
-            if (ImGui.Selectable("Skip it", !flag))
-                flag = false;
-        }
-    }
+    private MeldLog? meldLog;
 
     private void DrawItemSlot(ItemSlot slot)
     {
@@ -200,10 +186,9 @@ public partial class MainWindow : Window, IDisposable
 
         ImGui.Text("");
 
-        ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(0, 0));
-        foreach (var (i, m) in Enumerable.Range(1, 5).Zip(slot.Materia))
-            DrawMateria(m, i > maxSlots);
-        ImGui.PopStyleVar();
+        using (ImRaii.PushStyle(ImGuiStyleVar.ItemSpacing, new Vector2(0, 0)))
+            foreach (var (i, m) in Enumerable.Range(1, 5).Zip(slot.Materia))
+                DrawMateria(m, i > maxSlots);
     }
 
     private void DrawMateria(uint itemId, bool over)
@@ -225,9 +210,7 @@ public partial class MainWindow : Window, IDisposable
             ImGui.Image(t.ImGuiHandle, new(32, 32));
 
             if (ImGui.IsItemHovered())
-            {
                 ImGui.SetTooltip($"{Data.ItemName(itemId)} ({materia})");
-            }
         }
     }
 }

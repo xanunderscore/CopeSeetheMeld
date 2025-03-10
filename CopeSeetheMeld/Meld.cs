@@ -8,10 +8,8 @@ using static CopeSeetheMeld.Data;
 
 namespace CopeSeetheMeld;
 
-public class Meld(Gearset goal, bool doOvermeld = true, bool stopOnMissingItem = false, bool stopOnMissingMateria = false) : AutoCommon
+public class Meld(Gearset goal, MeldOptions opts, MeldLog? log) : AutoCommon
 {
-    private readonly bool Overmeld = doOvermeld;
-
     protected override async Task Execute()
     {
         ErrorIf(Game.PlayerIsBusy, "Can't meld while occupied");
@@ -22,7 +20,7 @@ public class Meld(Gearset goal, bool doOvermeld = true, bool stopOnMissingItem =
             var currentItem = FindItem(desiredItem, itemSlot, foundItems);
             if (currentItem == null)
             {
-                if (stopOnMissingItem)
+                if (opts.StopOnMissingItem)
                     throw new ItemNotFoundException(desiredItem.Id, desiredItem.HighQuality);
 
                 continue;
@@ -35,10 +33,12 @@ public class Meld(Gearset goal, bool doOvermeld = true, bool stopOnMissingItem =
             }
             catch (MateriaNotFoundException)
             {
-                if (stopOnMissingMateria)
+                if (opts.StopOnMissingMateria)
                     throw;
             }
         }
+
+        log?.Finish();
 
         unsafe { AgentMateriaAttach.Instance()->Hide(); }
     }
@@ -131,10 +131,22 @@ public class Meld(Gearset goal, bool doOvermeld = true, bool stopOnMissingItem =
             }
             else
             {
+                if (opts.Mode == MeldOptions.SpecialMode.MeldOnly)
+                {
+                    Log($"Retrieval needed for slot {i}");
+                    return;
+                }
+
                 // retrieve materia until slot is empty
                 await EnsureSlotEmpty(have, i);
                 break;
             }
+        }
+
+        if (opts.Mode == MeldOptions.SpecialMode.RetrieveOnly)
+        {
+            Log($"Done with retrievals, exiting");
+            return;
         }
 
         // do regular melds
@@ -142,18 +154,23 @@ public class Meld(Gearset goal, bool doOvermeld = true, bool stopOnMissingItem =
             await MeldOne(have, m);
 
         // do overmelds
-        if (Overmeld)
+        if (opts.Overmeld)
         {
             foreach (var w in wantMat.Skip(normalSlotCount))
                 await MeldOne(have, w);
         }
-        else
+        else if (wantMat.Skip(normalSlotCount).Any())
             Log($"Skipping overmelds for {have}");
     }
 
     private async Task MeldOne(ItemRef foundItem, Mat m)
     {
         Status = $"Melding {m} onto {foundItem}";
+
+        log?.Report(Status);
+
+        if (opts.DryRun)
+            return;
 
         await OpenAgent();
         await SelectItem(foundItem);
@@ -168,7 +185,13 @@ public class Meld(Gearset goal, bool doOvermeld = true, bool stopOnMissingItem =
 
     private async Task EnsureSlotEmpty(ItemRef foundItem, int slotIndex)
     {
-        Status = $"Retrieving from {foundItem}";
+        Status = $"Retrieving {foundItem.MateriaCount - slotIndex} materia from {foundItem}";
+
+        if (foundItem.MateriaCount > slotIndex)
+            log?.Report(Status);
+
+        if (opts.DryRun)
+            return;
 
         while (foundItem.MateriaCount > slotIndex)
         {
