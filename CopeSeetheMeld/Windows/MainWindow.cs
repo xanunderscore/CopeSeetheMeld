@@ -68,7 +68,7 @@ public partial class MainWindow : Window, IDisposable
             ImGui.SetTooltip($"xivgear.app URL, etro.gg URL, or Teamcraft \"Copy gearset to clipboard\"");
 
         using (ImRaii.Disabled(!ctrl))
-            if (ImGui.Button("Delete all"))
+            if (ImGui.Button("Delete all saved gearsets (hold CTRL)"))
             {
                 Config.Gearsets.Clear();
                 Config.SelectedGearset = null;
@@ -108,7 +108,7 @@ public partial class MainWindow : Window, IDisposable
         }
 
         using (ImRaii.Disabled(!ImGui.GetIO().KeyCtrl))
-            if (ImGui.Button("Delete"))
+            if (ImGui.Button("Delete this gearset (hold CTRL)"))
             {
                 Config.Gearsets.Remove(gs.Name);
                 Config.SelectedGearset = null;
@@ -149,7 +149,7 @@ public partial class MainWindow : Window, IDisposable
         meldOptions.Draw();
 
         using (ImRaii.Disabled(Game.PlayerIsBusy))
-            if (ImGui.Button("Meld it!"))
+            if (ImGui.Button("Go!"))
             {
                 meldLog = new();
                 auto.Start(new Meld(gs, meldOptions, meldLog));

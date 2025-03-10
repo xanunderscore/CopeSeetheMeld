@@ -60,7 +60,7 @@ public class MeldOptions
 
     private static string ModeString(SpecialMode m) => m switch
     {
-        SpecialMode.MeldOnly => "Meld only, skip items where retrieval is needed",
+        SpecialMode.MeldOnly => "Meld only, skip item if retrieval is needed",
         SpecialMode.RetrieveOnly => "Retrieve only, do not meld",
         _ => "Normal"
     };
@@ -88,5 +88,9 @@ public class MeldLog
     public bool Done;
 
     public void Report(string msg) => Actions.Add(msg);
-    public void Finish() => Done = true;
+    public void Finish()
+    {
+        Actions.Add("All done!");
+        Done = true;
+    }
 }
