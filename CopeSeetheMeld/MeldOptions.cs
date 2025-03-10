@@ -3,6 +3,7 @@ using Dalamud.Interface.Utility.Raii;
 using ImGuiNET;
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 
 namespace CopeSeetheMeld;
 
@@ -10,15 +11,26 @@ public class MeldOptions
 {
     public enum SpecialMode : uint
     {
+        [Display("Normal")]
         None,
+        [Display("Meld only - skip items that need retrieval")]
         MeldOnly,
+        [Display("Retrieve only, don't meld")]
         RetrieveOnly
+    }
+
+    public enum StopBehavior : uint
+    {
+        [Display("Skip to next item")]
+        Skip,
+        [Display("Stop melding")]
+        Stop
     }
 
     public bool DryRun = true;
     public bool Overmeld = true;
-    public bool StopOnMissingItem = false;
-    public bool StopOnMissingMateria = false;
+    public StopBehavior StopOnMissingItem = StopBehavior.Skip;
+    public StopBehavior StopOnMissingMateria = StopBehavior.Skip;
     public SpecialMode Mode = SpecialMode.None;
 
     public void Draw()
@@ -30,40 +42,39 @@ public class MeldOptions
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip($"Don't do any melds - just output what changes would be made given current gear.");
 
-        EnumCombo("Mode", ModeString, ref Mode);
+        EnumCombo("Mode", ref Mode);
 
-        DrawStopFlag("If an item is missing:", ref StopOnMissingItem);
+        EnumCombo("If an item is missing", ref StopOnMissingItem);
         using (ImRaii.Disabled(Mode == SpecialMode.RetrieveOnly))
         {
-            DrawStopFlag("If materia is missing:", ref StopOnMissingMateria);
+            EnumCombo("If materia is missing", ref StopOnMissingMateria);
             ImGui.Checkbox("Do overmelds", ref Overmeld);
         }
     }
 
-    private static void EnumCombo<T>(string label, Func<T, string> display, ref T v) where T : Enum
+    private static void EnumCombo<T>(string label, ref T v) where T : Enum
     {
         ImGui.AlignTextToFramePadding();
         ImGui.Text($"{label}:");
         ImGui.SameLine();
         ImGui.SetNextItemWidth(200);
-        using var comb = ImRaii.Combo($"###{label}", display(v));
+        using var comb = ImRaii.Combo($"###{label}", EnumString(v));
         if (comb)
         {
             foreach (var raw in Enum.GetValues(typeof(T)))
             {
                 var opt = (T)raw;
-                if (ImGui.Selectable(display(opt), v.Equals(opt)))
+                if (ImGui.Selectable(EnumString(opt), v.Equals(opt)))
                     v = opt;
             }
         }
     }
 
-    private static string ModeString(SpecialMode m) => m switch
+    public static string EnumString(Enum v)
     {
-        SpecialMode.MeldOnly => "Meld only, skip item if retrieval is needed",
-        SpecialMode.RetrieveOnly => "Retrieve only, do not meld",
-        _ => "Normal"
-    };
+        var name = v.ToString();
+        return v.GetType().GetField(name)?.GetCustomAttribute<DisplayAttribute>()?.Label ?? name;
+    }
 
     private static void DrawStopFlag(string cond, ref bool stopFlag)
     {

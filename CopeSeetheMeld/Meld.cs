@@ -23,7 +23,7 @@ public class Meld(Gearset goal, MeldOptions opts, MeldLog? log) : AutoTask
                 var currentItem = FindItem(desiredItem, itemSlot, foundItems);
                 if (currentItem == null)
                 {
-                    if (opts.StopOnMissingItem)
+                    if (opts.StopOnMissingItem == MeldOptions.StopBehavior.Stop)
                         throw new ItemNotFoundException(desiredItem.Id, desiredItem.HighQuality);
 
                     continue;
@@ -36,7 +36,7 @@ public class Meld(Gearset goal, MeldOptions opts, MeldLog? log) : AutoTask
                 }
                 catch (MateriaNotFoundException)
                 {
-                    if (opts.StopOnMissingMateria)
+                    if (opts.StopOnMissingMateria == MeldOptions.StopBehavior.Stop)
                         throw;
                 }
             }
