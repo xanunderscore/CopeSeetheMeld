@@ -35,7 +35,7 @@ public sealed class Plugin : IDalamudPlugin
         InteropGenerator.Runtime.Resolver.GetInstance.Resolve();
         Config = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
 
-        MainWindow = new() { IsOpen = true };
+        MainWindow = new();
         MeldWindow = new();
 
         WindowSystem.AddWindow(MainWindow);
