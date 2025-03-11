@@ -26,7 +26,6 @@ public sealed class Plugin : IDalamudPlugin
 
     public readonly WindowSystem WindowSystem = new("CSM");
     private MainWindow MainWindow { get; init; }
-    private MeldWindow MeldWindow { get; init; }
 
     public Plugin(IDalamudPluginInterface dalamud, ICommandManager commandManager, ISigScanner sigScanner, IDataManager dataManager, IGameInteropProvider hooking)
     {
@@ -36,13 +35,10 @@ public sealed class Plugin : IDalamudPlugin
         Config = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
 
         MainWindow = new();
-        MeldWindow = new();
 
         WindowSystem.AddWindow(MainWindow);
-        WindowSystem.AddWindow(MeldWindow);
 
-        CommandManager.AddHandler("/cope", new CommandInfo(OnCope) { HelpMessage = "Meld" });
-        CommandManager.AddHandler("/cmeld", new CommandInfo(OnMeld) { HelpMessage = "Open manual meld window" });
+        CommandManager.AddHandler("/cope", new CommandInfo(OnCope) { HelpMessage = "Open meld UI" });
 
         PluginInterface.UiBuilder.Draw += DrawUI;
         PluginInterface.UiBuilder.OpenConfigUi += ToggleMainUI;
@@ -55,11 +51,9 @@ public sealed class Plugin : IDalamudPlugin
         WindowSystem.RemoveAllWindows();
         MainWindow.Dispose();
         CommandManager.RemoveHandler("/cope");
-        CommandManager.RemoveHandler("/cmeld");
     }
 
     private void OnCope(string command, string args) => ToggleMainUI();
-    private void OnMeld(string command, string args) => MeldWindow.Toggle();
 
     private void DrawUI() => WindowSystem.Draw();
 
