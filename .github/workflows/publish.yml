@@ -39,7 +39,7 @@ jobs:
         uses: PunishXIV/dynamis-action@v1
         id: dynamis
         with:
-          plugin_id: 30
+          plugin_id: 69
           internal_name: "CopeSeetheMeld"
           version_number: ${{ env.tag }}
           path: "CopeSeetheMeld/bin/Release/CopeSeetheMeld/latest.zip"
