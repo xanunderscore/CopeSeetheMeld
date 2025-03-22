@@ -351,6 +351,7 @@ public class Meld(Gearset goal, MeldOptions opts, MeldLog? log) : AutoTask
                 InventoryType.ArmoryLegs or InventoryType.ArmoryFeets => AgentMateriaAttach.FilterCategory.ArmouryLegsFeet,
                 InventoryType.ArmoryEar or InventoryType.ArmoryNeck => AgentMateriaAttach.FilterCategory.ArmouryNeckEars,
                 InventoryType.ArmoryWrist or InventoryType.ArmoryRings => AgentMateriaAttach.FilterCategory.ArmouryWristRing,
+                InventoryType.EquippedItems => AgentMateriaAttach.FilterCategory.Equipped,
                 _ => AgentMateriaAttach.FilterCategory.None
             };
         }
