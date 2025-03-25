@@ -11,9 +11,9 @@ namespace CopeSeetheMeld;
 internal static unsafe class Game
 {
     public static bool IsAttachAgentActive() => AgentMateriaAttach.Instance()->IsAgentActive();
-    public static bool AgentLoading() => AgentMateriaAttach.Instance()->StateVar != 0;
-    public static AgentMateriaAttach.FilterCategory ActiveFilter() => AgentMateriaAttach.Instance()->ActiveFilter;
-    public static int SelectedItem() => AgentMateriaAttach.Instance()->SelectedItem;
+    public static bool AgentLoading() => AgentMateriaAttach.Instance()->UpdateState != 0;
+    public static AgentMateriaAttach.FilterCategory ActiveFilter() => AgentMateriaAttach.Instance()->Category;
+    public static int SelectedItem() => AgentMateriaAttach.Instance()->SelectedItemIndex;
 
     public static AtkValue AgentReceiveEvent(AgentInterface* agent, ulong eventKind, int[] args) => WithArgs(args, (ptr, len) =>
         {

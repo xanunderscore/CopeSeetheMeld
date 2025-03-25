@@ -200,7 +200,7 @@ public class Meld(Gearset goal, MeldOptions opts, MeldLog? log) : AutoTask
         if (overmeldSlot >= 0)
         {
             var chanceRow = Plugin.LuminaRow<MateriaGrade>(m.Grade);
-            byte[] chances = foundItem.IsHQ ? [chanceRow.Unknown6, chanceRow.Unknown7, chanceRow.Unknown8, chanceRow.Unknown9] : [chanceRow.Unknown2, chanceRow.Unknown3, chanceRow.Unknown4, chanceRow.Unknown5];
+            var chances = foundItem.IsHQ ? chanceRow.OvermeldHQPercent : chanceRow.OvermeldNQPercent;
             Status = $"{Status} ({chances[overmeldSlot]}% success rate)";
         }
 
@@ -292,7 +292,7 @@ public class Meld(Gearset goal, MeldOptions opts, MeldLog? log) : AutoTask
         unsafe
         {
             var agent = AgentMateriaAttach.Instance();
-            if (agent->ActiveFilter != cat)
+            if (agent->Category != cat)
                 Game.AgentReceiveEvent(&AgentMateriaAttach.Instance()->AgentInterface, 0, [0, (int)cat]);
         }
 
@@ -304,7 +304,7 @@ public class Meld(Gearset goal, MeldOptions opts, MeldLog? log) : AutoTask
             var it = item.Item.Value;
             for (var i = 0; i < agent->ItemCount; i++)
             {
-                if (it == *agent->Context->Items[i])
+                if (it == agent->Data->ItemsSorted[i].Value->Item)
                 {
                     Game.AgentReceiveEvent(&agent->AgentInterface, 0, [1, i, 1, 0]);
                     return;
@@ -327,7 +327,7 @@ public class Meld(Gearset goal, MeldOptions opts, MeldLog? log) : AutoTask
             var agent = AgentMateriaAttach.Instance();
             for (var i = 0; i < agent->MateriaCount; i++)
             {
-                var invItem = *agent->Context->Materia[i];
+                var invItem = agent->Data->MateriaSorted[i].Value->Item;
                 if (invItem->ItemId == materiaItemId)
                 {
                     Game.AgentReceiveEvent(&agent->AgentInterface, 0, [2, i, 1, 0]);
