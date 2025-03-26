@@ -18,7 +18,7 @@ public partial class Import(string input) : AutoTask
     [GeneratedRegex(@"https?:\/\/etro\.gg\/gearset\/([^/]+)", RegexOptions.IgnoreCase, "en-US")]
     private static partial Regex PatternEtro();
 
-    [GeneratedRegex(@"(?:https?:\/\/xivgear\.app\/\?page=sl%7C|https?:\/\/api\.xivgear\.app\/shortlink\/)([a-zA-Z0-9-]+)", RegexOptions.IgnoreCase, "en-US")]
+    [GeneratedRegex(@"(?:https?:\/\/xivgear\.app\/\?page=sl\||https?:\/\/api\.xivgear\.app\/shortlink\/)([a-zA-Z0-9-]+)(?:&selectedIndex=(\d+))?", RegexOptions.IgnoreCase, "en-US")]
     private static partial Regex PatternXIVG();
 
     protected override async Task Execute()
@@ -30,6 +30,8 @@ public partial class Import(string input) : AutoTask
             ImportTeamcraft(input);
             return;
         }
+
+        input = Uri.UnescapeDataString(input);
 
         var m1 = PatternEtro().Match(input);
         if (m1.Success)
@@ -43,7 +45,7 @@ public partial class Import(string input) : AutoTask
         if (m2.Success)
         {
             Status = "Importing from xivgear";
-            await ImportXIVG(m2.Groups[1].Value);
+            await ImportXIVG(m2.Groups[1].Value, m2.Groups[2].Value);
             return;
         }
 
@@ -53,6 +55,12 @@ public partial class Import(string input) : AutoTask
     private async Task ImportEtro(string gearsetId)
     {
         Log("Importing from etro");
+    }
+
+    public record class XGSetCollection
+    {
+        public required string name;
+        public required List<XGSet> sets;
     }
 
     public record class XGSet
@@ -69,13 +77,24 @@ public partial class Import(string input) : AutoTask
 
     public record class XGId
     {
-        public uint id;
+        public int id;
     }
 
-    private async Task ImportXIVG(string shortcode)
+    private async Task ImportXIVG(string shortcode, string gearIndex)
     {
+        var ix = gearIndex.Length == 0 ? -1 : int.Parse(gearIndex);
+
         var contents = await client.GetStringAsync($"https://api.xivgear.app/shortlink/{shortcode}");
-        var xgs = JsonSerializer.Deserialize<XGSet>(contents, jop) ?? throw new Exception("Bad response from server");
+        XGSet xgs;
+        if (ix >= 0)
+        {
+            var set = JsonSerializer.Deserialize<XGSetCollection>(contents, jop) ?? throw new Exception("Bad response from server");
+            xgs = set.sets[ix];
+        }
+        else
+        {
+            xgs = JsonSerializer.Deserialize<XGSet>(contents, jop) ?? throw new Exception("Bad response from server");
+        }
 
         var gs = Gearset.Create(xgs.name);
 
@@ -86,7 +105,8 @@ public partial class Import(string input) : AutoTask
 
             var slot = ItemSlot.Create(item.id);
             for (var i = 0; i < Math.Min(5, item.materia.Count); i++)
-                slot.Materia[i] = item.materia[i].id;
+                if (item.materia[i].id >= 0)
+                    slot.Materia[i] = (uint)item.materia[i].id;
 
             gs[ty] = slot;
         }

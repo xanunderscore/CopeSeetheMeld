@@ -1,6 +1,3 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Project Sdk="Dalamud.NET.Sdk/12.0.0">
-    <PropertyGroup>
-        <TargetFramework>net9.0-windows</TargetFramework>
-    </PropertyGroup>
+<Project Sdk="Dalamud.NET.Sdk/12.0.2">
 </Project>
