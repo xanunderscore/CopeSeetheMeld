@@ -18,7 +18,7 @@ public partial class Import(string input) : AutoTask
     [GeneratedRegex(@"https?:\/\/etro\.gg\/gearset\/([^/]+)", RegexOptions.IgnoreCase, "en-US")]
     private static partial Regex PatternEtro();
 
-    [GeneratedRegex(@"(?:https?:\/\/xivgear\.app\/\?page=sl\||https?:\/\/api\.xivgear\.app\/shortlink\/)([a-zA-Z0-9-]+)(?:&selectedIndex=(\d+))?", RegexOptions.IgnoreCase, "en-US")]
+    [GeneratedRegex(@"(?:https?:\/\/xivgear\.app\/\?page=sl\||https?:\/\/api\.xivgear\.app\/shortlink\/)([a-zA-Z0-9-]+)(?:&(?:selectedIndex|onlySetIndex)=(\d+))?", RegexOptions.IgnoreCase, "en-US")]
     private static partial Regex PatternXIVG();
 
     protected override async Task Execute()
@@ -103,7 +103,9 @@ public partial class Import(string input) : AutoTask
             if (!xgs.items.TryGetValue(field, out var item))
                 return;
 
-            var slot = ItemSlot.Create(item.id);
+            var row = Data.Item(item.id);
+
+            var slot = ItemSlot.Create(item.id, row.CanBeHq); // xivgear does not expose HQ-ness
             for (var i = 0; i < Math.Min(5, item.materia.Count); i++)
                 if (item.materia[i].id >= 0)
                     slot.Materia[i] = (uint)item.materia[i].id;
