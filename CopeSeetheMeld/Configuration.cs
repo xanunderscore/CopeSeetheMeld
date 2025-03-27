@@ -72,6 +72,8 @@ public class Configuration : IPluginConfiguration
     public int Version { get; set; } = 0;
     public Dictionary<string, Gearset> Gearsets = [];
     public string? SelectedGearset = null;
+    public bool IsOpen = false;
+    public MeldOptions LastUsedOptions = new();
 
     // the below exist just to make saving less cumbersome
     public void Save()

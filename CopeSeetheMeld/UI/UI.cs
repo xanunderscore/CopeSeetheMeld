@@ -2,7 +2,7 @@ using ImGuiNET;
 using Lumina.Excel.Sheets;
 using System;
 
-namespace CopeSeetheMeld;
+namespace CopeSeetheMeld.UI;
 
 public static class UI
 {

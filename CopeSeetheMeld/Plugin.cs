@@ -1,4 +1,3 @@
-using CopeSeetheMeld.Windows;
 using Dalamud.Game;
 using Dalamud.Game.Command;
 using Dalamud.Interface.Windowing;
@@ -24,13 +23,13 @@ public sealed class Plugin : IDalamudPlugin
     public static Configuration Config { get; private set; } = null!;
 
     public readonly WindowSystem WindowSystem = new("CSM");
-    private MainWindow MainWindow { get; init; }
+    private UI.MainWindow MainWindow { get; init; }
 
     public Plugin(IDalamudPluginInterface dalamud, ICommandManager commandManager, ISigScanner sigScanner, IDataManager dataManager, IGameInteropProvider hooking)
     {
         Config = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
 
-        MainWindow = new();
+        MainWindow = new() { IsOpen = Config.IsOpen };
 
         WindowSystem.AddWindow(MainWindow);
 

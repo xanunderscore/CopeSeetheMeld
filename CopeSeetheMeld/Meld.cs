@@ -15,39 +15,40 @@ public class Meld(Gearset goal, MeldOptions opts, MeldLog? log) : AutoTask
     {
         ErrorIf(Game.PlayerIsBusy, "Can't meld while occupied");
 
-        try
+        using var x = new OnDispose(() =>
         {
-            List<ItemRef> foundItems = [];
-            foreach (var (itemSlot, desiredItem) in goal.Slots)
+            unsafe
             {
-                var currentItem = FindItem(desiredItem, itemSlot, foundItems);
-                if (currentItem == null)
-                {
-                    if (opts.StopOnMissingItem == MeldOptions.StopBehavior.Stop)
-                        throw new ItemNotFoundException(desiredItem.Id, desiredItem.HighQuality);
+                AgentMateriaAttach.Instance()->Hide();
+            }
+        });
 
-                    continue;
-                }
+        List<ItemRef> foundItems = [];
+        foreach (var (itemSlot, desiredItem) in goal.Slots)
+        {
+            var currentItem = FindItem(desiredItem, itemSlot, foundItems);
+            if (currentItem == null)
+            {
+                if (opts.StopOnMissingItem == MeldOptions.StopBehavior.Stop)
+                    throw new ItemNotFoundException(desiredItem.Id, desiredItem.HighQuality);
 
-                foundItems.Add(currentItem);
-                try
-                {
-                    await MeldItem(desiredItem, currentItem);
-                }
-                catch (MateriaNotFoundException m)
-                {
-                    log?.ReportError(m);
-                    if (opts.StopOnMissingMateria == MeldOptions.StopBehavior.Stop)
-                        throw;
-                }
+                continue;
             }
 
-            log?.Finish();
+            foundItems.Add(currentItem);
+            try
+            {
+                await MeldItem(desiredItem, currentItem);
+            }
+            catch (MateriaNotFoundException m)
+            {
+                log?.ReportError(m);
+                if (opts.StopOnMissingMateria == MeldOptions.StopBehavior.Stop)
+                    throw;
+            }
         }
-        finally
-        {
-            unsafe { AgentMateriaAttach.Instance()->Hide(); }
-        }
+
+        log?.Finish();
     }
 
     private static IEnumerable<InventoryType> GetUsableInventories(ItemType ty)
@@ -198,13 +199,23 @@ public class Meld(Gearset goal, MeldOptions opts, MeldLog? log) : AutoTask
     {
         Status = $"Melding {m} onto {foundItem}";
 
+        var materiaAmount = 1;
+
         if (overmeldSlot >= 0)
         {
             var chanceRow = Plugin.LuminaRow<MateriaGrade>(m.Grade);
             var chances = foundItem.IsHQ ? chanceRow.OvermeldHQPercent : chanceRow.OvermeldNQPercent;
-            Status = $"{Status} ({chances[overmeldSlot]}% success rate)";
+
+            var confidence = opts.MeldConfidence * 0.01f;
+            var chanceWhole = chances[overmeldSlot];
+            var chance = chanceWhole * 0.01f;
+
+            materiaAmount = Math.Max((int)MathF.Ceiling(MathF.Log(1 - confidence) / MathF.Log(1 - chance)), 1);
+
+            Status = $"{Status} ({chanceWhole}% success rate)";
         }
 
+        log?.UseMateria(m, materiaAmount);
         log?.Report(Status);
 
         if (opts.DryRun)

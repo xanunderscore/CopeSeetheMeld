@@ -1,9 +1,11 @@
+using CopeSeetheMeld.UI;
 using Dalamud.Interface;
 using Dalamud.Interface.Utility.Raii;
 using ImGuiNET;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using static CopeSeetheMeld.Data;
 
 namespace CopeSeetheMeld;
 
@@ -29,6 +31,7 @@ public class MeldOptions
 
     public bool DryRun = true;
     public bool Overmeld = true;
+    public int MeldConfidence = 50;
     public StopBehavior StopOnMissingItem = StopBehavior.Skip;
     public StopBehavior StopOnMissingMateria = StopBehavior.Skip;
     public SpecialMode Mode = SpecialMode.None;
@@ -49,6 +52,11 @@ public class MeldOptions
         {
             EnumCombo("If materia is missing", ref StopOnMissingMateria);
             ImGui.Checkbox("Do overmelds", ref Overmeld);
+        }
+        using (ImRaii.Disabled(!Overmeld))
+        {
+            ImGui.SetNextItemWidth(200);
+            ImGui.DragInt("Meld confidence", ref MeldConfidence, 0.25f, 50, 99, "%d%%");
         }
     }
 
@@ -79,11 +87,17 @@ public class MeldOptions
 
 public class MeldLog
 {
-    public List<string> Actions = [];
+    public readonly List<string> Actions = [];
+    public readonly Dictionary<Mat, int> MateriaUsed = [];
     public bool Done;
 
     public void Report(string msg) => Actions.Add(msg);
     public void ReportError(Exception ex) => Actions.Add(ex.Message);
+    public void UseMateria(Mat materiaId, int count = 1)
+    {
+        var c = MateriaUsed.TryGetValue(materiaId, out var v) ? v : 0;
+        MateriaUsed[materiaId] = c + count;
+    }
     public void Finish()
     {
         Actions.Add("All done!");

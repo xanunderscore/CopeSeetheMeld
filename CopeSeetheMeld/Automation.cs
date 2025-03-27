@@ -132,3 +132,7 @@ public sealed class Automation : IDisposable
     }
 }
 
+public readonly record struct OnDispose(Action a) : IDisposable
+{
+    public void Dispose() => a();
+}
