@@ -29,7 +29,7 @@ public static class Data
 
         public unsafe Mat GetMateria(int slot) => new(Item.Value->GetMateriaId((byte)slot), Item.Value->GetMateriaGrade((byte)slot));
 
-        public override unsafe string ToString() => $"{ItemName(Item.Value->GetItemId())} {Container}/{Slot}";
+        public override unsafe string ToString() => $"{ItemName(Item.Value->GetBaseItemId())} {Container}/{Slot}";
     }
 
 

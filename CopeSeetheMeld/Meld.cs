@@ -34,8 +34,9 @@ public class Meld(Gearset goal, MeldOptions opts, MeldLog? log) : AutoTask
                 {
                     await MeldItem(desiredItem, currentItem);
                 }
-                catch (MateriaNotFoundException)
+                catch (MateriaNotFoundException m)
                 {
+                    log?.ReportError(m);
                     if (opts.StopOnMissingMateria == MeldOptions.StopBehavior.Stop)
                         throw;
                 }

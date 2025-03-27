@@ -75,22 +75,6 @@ public class MeldOptions
         var name = v.ToString();
         return v.GetType().GetField(name)?.GetCustomAttribute<DisplayAttribute>()?.Label ?? name;
     }
-
-    private static void DrawStopFlag(string cond, ref bool stopFlag)
-    {
-        ImGui.AlignTextToFramePadding();
-        ImGui.Text(cond);
-        ImGui.SameLine();
-        ImGui.SetNextItemWidth(200);
-        using var comb = ImRaii.Combo($"###{cond}", stopFlag ? "Stop melding" : "Skip to next item");
-        if (comb)
-        {
-            if (ImGui.Selectable("Stop melding", stopFlag))
-                stopFlag = true;
-            if (ImGui.Selectable("Skip to next item", !stopFlag))
-                stopFlag = false;
-        }
-    }
 }
 
 public class MeldLog
@@ -99,6 +83,7 @@ public class MeldLog
     public bool Done;
 
     public void Report(string msg) => Actions.Add(msg);
+    public void ReportError(Exception ex) => Actions.Add(ex.Message);
     public void Finish()
     {
         Actions.Add("All done!");
