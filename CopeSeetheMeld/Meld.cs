@@ -11,7 +11,7 @@ namespace CopeSeetheMeld;
 
 public class Meld(Gearset goal, MeldOptions opts, MeldLog? log) : AutoTask
 {
-    protected override async Task Execute()
+    protected override async System.Threading.Tasks.Task Execute()
     {
         ErrorIf(Game.PlayerIsBusy, "Can't meld while occupied");
 
@@ -114,7 +114,7 @@ public class Meld(Gearset goal, MeldOptions opts, MeldLog? log) : AutoTask
         }
     }
 
-    private async Task MeldItem(ItemSlot want, ItemRef have)
+    private async System.Threading.Tasks.Task MeldItem(ItemSlot want, ItemRef have)
     {
         var shouldContinue = await MeldNormal(want, have);
         if (!shouldContinue)
@@ -195,7 +195,7 @@ public class Meld(Gearset goal, MeldOptions opts, MeldLog? log) : AutoTask
         return true;
     }
 
-    private async Task MeldOne(ItemRef foundItem, Mat m, int overmeldSlot = -1)
+    private async System.Threading.Tasks.Task MeldOne(ItemRef foundItem, Mat m, int overmeldSlot = -1)
     {
         Status = $"Melding {m} onto {foundItem}";
 
@@ -239,7 +239,7 @@ public class Meld(Gearset goal, MeldOptions opts, MeldLog? log) : AutoTask
         }
     }
 
-    private async Task EnsureSlotEmpty(ItemRef foundItem, int slotIndex)
+    private async System.Threading.Tasks.Task EnsureSlotEmpty(ItemRef foundItem, int slotIndex)
     {
         if (foundItem.MateriaCount <= slotIndex)
             return;
@@ -279,7 +279,7 @@ public class Meld(Gearset goal, MeldOptions opts, MeldLog? log) : AutoTask
         public override string Message => $"Ran out of materia while trying to attach {mat} to {i}.";
     }
 
-    protected async Task OpenAgent()
+    protected async System.Threading.Tasks.Task OpenAgent()
     {
         if (CancelToken.IsCancellationRequested)
             Error("task canceled by user");
@@ -296,7 +296,7 @@ public class Meld(Gearset goal, MeldOptions opts, MeldLog? log) : AutoTask
         await WaitWhile(() => !Game.IsAttachAgentActive(), "OpenAgent");
     }
 
-    protected async Task SelectItem(ItemRef item)
+    protected async System.Threading.Tasks.Task SelectItem(ItemRef item)
     {
         var cat = GetCategory(item);
         ErrorIf(cat == AgentMateriaAttach.FilterCategory.None, $"Item {item} has no valid inventory category");
@@ -327,7 +327,7 @@ public class Meld(Gearset goal, MeldOptions opts, MeldLog? log) : AutoTask
         }
     }
 
-    protected async Task SelectMateria(Mat m)
+    protected async System.Threading.Tasks.Task SelectMateria(Mat m)
     {
         ErrorIf(Game.SelectedItem() < 0, "No item selected in agent");
         await WaitWhile(Game.AgentLoading, "WaitAgentLoad");

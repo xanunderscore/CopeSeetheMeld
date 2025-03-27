@@ -45,7 +45,7 @@ internal class MeldUI : IDisposable
         if (ImGui.Button("Import from clipboard"))
         {
             Plugin.Log.Debug($"importing {ImGui.GetClipboardText()}");
-            auto.Start(new Import(ImGui.GetClipboardText()));
+            auto.Start(new Import.Import(ImGui.GetClipboardText()));
         }
 
         ImGui.SameLine();

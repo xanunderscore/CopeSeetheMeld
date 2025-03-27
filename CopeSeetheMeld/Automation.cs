@@ -61,15 +61,15 @@ public abstract class AutoTask
     }
 
     // implementations are typically expected to be async (coroutines)
-    protected abstract Task Execute();
+    protected abstract System.Threading.Tasks.Task Execute();
 
     protected CancellationToken CancelToken => cts.Token;
 
     // wait for a few frames
-    protected Task NextFrame(int numFramesToWait = 1) => Plugin.Framework.DelayTicks(numFramesToWait, cts.Token);
+    protected System.Threading.Tasks.Task NextFrame(int numFramesToWait = 1) => Plugin.Framework.DelayTicks(numFramesToWait, cts.Token);
 
     // wait until condition function returns false, checking once every N frames
-    protected async Task WaitWhile(Func<bool> condition, string scopeName, int checkFrequency = 1)
+    protected async System.Threading.Tasks.Task WaitWhile(Func<bool> condition, string scopeName, int checkFrequency = 1)
     {
         using var scope = BeginScope(scopeName);
         while (condition())
