@@ -107,7 +107,7 @@ internal class MeldUI : IDisposable
             gs.Sort();
         }
 
-        using (ImRaii.Disabled(Game.PlayerIsBusy))
+        using (ImRaii.Disabled(Game.PlayerIsBusy && !meldOptions.DryRun))
             if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Play, "Meld!"))
             {
                 Plugin.Config.LastUsedOptions = meldOptions;
@@ -132,6 +132,7 @@ internal class MeldUI : IDisposable
             if (ImGui.Button("Show log"))
             {
                 popupOpen = true;
+                meldLog.Count();
                 ImGui.OpenPopup("###showlog");
             }
             ImGui.SameLine();
@@ -216,10 +217,11 @@ internal class MeldUI : IDisposable
 
         var materiaOrdered = meldLog.MateriaUsed.OrderBy(m => (m.Key.Id, -m.Key.Grade));
 
-        using (ImRaii.Table("###modaltable", 2))
+        using (ImRaii.Table("###modaltable", 3))
         {
             ImGui.TableSetupColumn("Name");
-            ImGui.TableSetupColumn("Quantity", ImGuiTableColumnFlags.WidthFixed, 200);
+            ImGui.TableSetupColumn("Total", ImGuiTableColumnFlags.WidthFixed, 100);
+            ImGui.TableSetupColumn("Missing", ImGuiTableColumnFlags.WidthFixed, 100);
             ImGui.TableHeadersRow();
 
 
@@ -230,6 +232,11 @@ internal class MeldUI : IDisposable
                 ImGui.TextUnformatted($"{m.Item.Name}");
                 ImGui.TableNextColumn();
                 ImGui.TextUnformatted($"{cnt}");
+                ImGui.TableNextColumn();
+                if (meldLog.MateriaNeeded.TryGetValue(m, out var n))
+                    ImGui.TextUnformatted(n.ToString());
+                else
+                    ImGui.TextUnformatted("-");
             }
         }
 
@@ -237,7 +244,13 @@ internal class MeldUI : IDisposable
         {
             var sb = new StringBuilder();
             foreach (var (m, cnt) in materiaOrdered)
-                sb.AppendLine($"- {m.Item.Name} ({m}) x{cnt}");
+            {
+                var needed = meldLog.MateriaNeeded.TryGetValue(m, out var n) ? n : 0;
+                if (needed == 0)
+                    continue;
+
+                sb.AppendLine($"- {m.Item.Name} ({m}) x{needed}");
+            }
             ImGui.SetClipboardText(sb.ToString());
         }
 

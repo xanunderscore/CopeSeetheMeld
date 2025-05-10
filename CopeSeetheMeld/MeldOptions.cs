@@ -1,6 +1,7 @@
 using CopeSeetheMeld.UI;
 using Dalamud.Interface;
 using Dalamud.Interface.Utility.Raii;
+using FFXIVClientStructs.FFXIV.Client.Game;
 using ImGuiNET;
 using System;
 using System.Collections.Generic;
@@ -89,6 +90,7 @@ public class MeldLog
 {
     public readonly List<string> Actions = [];
     public readonly Dictionary<Mat, int> MateriaUsed = [];
+    public readonly Dictionary<Mat, int> MateriaNeeded = [];
     public bool Done;
 
     public void Report(string msg) => Actions.Add(msg);
@@ -102,5 +104,15 @@ public class MeldLog
     {
         Actions.Add("All done!");
         Done = true;
+    }
+
+    public unsafe void Count()
+    {
+        foreach (var (m, c) in MateriaUsed)
+        {
+            var needed = c - InventoryManager.Instance()->GetInventoryItemCount(m.Item.RowId, false, checkEquipped: false, checkArmory: false);
+            if (needed > 0)
+                MateriaNeeded[m] = needed;
+        }
     }
 }
