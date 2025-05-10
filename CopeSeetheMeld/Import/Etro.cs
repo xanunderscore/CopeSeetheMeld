@@ -11,7 +11,7 @@ public partial class Import
 
         var egs = JsonSerializer.Deserialize<EtroGearset>(contents, jop) ?? throw new System.Exception("Bad response from server");
 
-        var gs = Gearset.Create(egs.name);
+        var gs = new Gearset(egs.name);
 
         void mk(ItemType ty, uint? itemId, string keyExtra = "")
         {
@@ -20,13 +20,13 @@ public partial class Import
 
             var row = Data.Item(itemId.Value);
 
-            var slot = ItemSlot.Create(itemId.Value, row.CanBeHq);
+            var slot = new ItemSlot(itemId.Value, ty, row.CanBeHq);
             if (egs.materia.TryGetValue($"{itemId}{keyExtra}", out var materias))
                 for (var i = 1; i <= 5; i++)
                     if (materias.TryGetValue(i.ToString(), out var mid))
                         slot.Materia[i - 1] = mid;
 
-            gs[ty] = slot;
+            gs.Items.Add(slot);
         }
 
         mk(ItemType.Weapon, egs.weapon);
@@ -39,10 +39,10 @@ public partial class Import
         mk(ItemType.Ears, egs.ears);
         mk(ItemType.Neck, egs.neck);
         mk(ItemType.Wrists, egs.wrists);
-        mk(ItemType.RingL, egs.fingerL, "L");
-        mk(ItemType.RingR, egs.fingerR, "R");
+        mk(ItemType.Ring, egs.fingerL, "L");
+        mk(ItemType.Ring, egs.fingerR, "R");
 
-        Plugin.Config.Gearsets.Add(egs.name, gs);
+        Plugin.Config.GearsetList.Add(gs);
     }
 
     public record class EtroGearset

@@ -14,7 +14,7 @@ public partial class Import
 
         var name = MakeTeamcraftSetName();
 
-        var gs = Gearset.Create(name);
+        var gs = new Gearset(name);
 
         var lines = markdown.Split(Environment.NewLine);
 
@@ -47,10 +47,7 @@ public partial class Import
                 if (ty == ItemType.Invalid)
                     continue;
 
-                if (ty == ItemType.RingL && gs[ItemType.RingL].Id != 0)
-                    ty = ItemType.RingR;
-
-                var slot = ItemSlot.Create(matchedRow.RowId, hq);
+                var slot = new ItemSlot(matchedRow.RowId, ty, hq);
                 foreach (var (m, ix) in materia.Select((m, i) => (m, i)))
                 {
                     if (Data.GetItemByName(m) is { } matchedMateria)
@@ -59,30 +56,30 @@ public partial class Import
                         slot.Materia[ix] = matchedMateria.RowId;
                     }
                 }
-                gs[ty] = slot;
+                gs.Items.Add(slot);
             }
 
             i++;
         }
 
-        Plugin.Config.Gearsets.Add(name, gs);
+        Plugin.Config.GearsetList.Add(gs);
     }
 
     private static string MakeTeamcraftSetName()
     {
-        if (!Plugin.Config.Gearsets.ContainsKey("Teamcraft Import"))
-            return "Teamcraft Import";
+        var i = 0;
 
-        var i = 1;
-        while (Plugin.Config.Gearsets.ContainsKey($"Teamcraft Import ({i})"))
+        string genName(int i) => i == 0 ? "Teamcraft Import" : $"Teamcraft Import ({i})";
+
+        while (Plugin.Config.GearsetList.Any(g => g.Name == genName(i)))
             i++;
 
         return $"Teamcraft Import ({i})";
     }
 
-    private static readonly ItemType[] ItemTypesSheetOrder = [ItemType.Weapon, ItemType.Offhand, ItemType.Head, ItemType.Body, ItemType.Hands, ItemType.Invalid, ItemType.Legs, ItemType.Feet, ItemType.Ears, ItemType.Neck, ItemType.Wrists, ItemType.RingL, ItemType.RingR];
+    public static readonly ItemType[] ItemTypesSheetOrder = [ItemType.Weapon, ItemType.Offhand, ItemType.Head, ItemType.Body, ItemType.Hands, ItemType.Invalid, ItemType.Legs, ItemType.Feet, ItemType.Ears, ItemType.Neck, ItemType.Wrists, ItemType.Ring];
 
-    private static ItemType GetItemEquipType(Item it)
+    public static ItemType GetItemEquipType(Item it)
     {
         var esc = Plugin.DataManager.Excel.GetSheet<RawRow>(null, "EquipSlotCategory").GetRowOrDefault(it.EquipSlotCategory.RowId);
 

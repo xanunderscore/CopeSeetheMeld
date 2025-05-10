@@ -28,6 +28,7 @@ public sealed class Plugin : IDalamudPlugin
     public Plugin(IDalamudPluginInterface dalamud, ICommandManager commandManager, ISigScanner sigScanner, IDataManager dataManager, IGameInteropProvider hooking)
     {
         Config = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
+        Config.Migrate();
 
         MainWindow = new() { IsOpen = Config.IsOpen };
 

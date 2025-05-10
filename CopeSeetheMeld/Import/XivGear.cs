@@ -42,10 +42,11 @@ public partial class Import
         }
         else
         {
+            // TODO even for single gearsets, api can return janky results sometimes and cause this to fail, e.g. https://xivgear.app/?page=sl%7Cf4dadaec-dedf-48d9-9936-caaa64033a30
             xgs = JsonSerializer.Deserialize<XGSet>(contents, jop) ?? throw new Exception("Bad response from server");
         }
 
-        var gs = Gearset.Create(xgs.name);
+        var gs = new Gearset(xgs.name);
 
         void mk(ItemType ty, string field)
         {
@@ -54,12 +55,12 @@ public partial class Import
 
             var row = Data.Item(item.id);
 
-            var slot = ItemSlot.Create(item.id, row.CanBeHq); // xivgear does not expose HQ-ness
+            var slot = new ItemSlot(item.id, ty, row.CanBeHq);
             for (var i = 0; i < Math.Min(5, item.materia.Count); i++)
                 if (item.materia[i].id >= 0)
                     slot.Materia[i] = (uint)item.materia[i].id;
 
-            gs[ty] = slot;
+            gs.Items.Add(slot);
         }
 
         mk(ItemType.Weapon, "Weapon");
@@ -72,9 +73,9 @@ public partial class Import
         mk(ItemType.Ears, "Ears");
         mk(ItemType.Neck, "Neck");
         mk(ItemType.Wrists, "Wrist");
-        mk(ItemType.RingL, "RingLeft");
-        mk(ItemType.RingR, "RingRight");
+        mk(ItemType.Ring, "RingLeft");
+        mk(ItemType.Ring, "RingRight");
 
-        Plugin.Config.Gearsets.Add(xgs.name, gs);
+        Plugin.Config.GearsetList.Add(gs);
     }
 }

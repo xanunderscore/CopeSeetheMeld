@@ -1,2 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Project Sdk="Dalamud.NET.Sdk/12.0.2" />
+<Project Sdk="Dalamud.NET.Sdk/12.0.2">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <WarningsAsErrors>CS0618</WarningsAsErrors>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <WarningsAsErrors>CS0618</WarningsAsErrors>
+  </PropertyGroup>
+</Project>

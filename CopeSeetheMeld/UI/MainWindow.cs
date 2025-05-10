@@ -62,6 +62,11 @@ public partial class MainWindow : Window, IDisposable
             if (utils)
                 DrawUtils();
         }
+        using (var cfg = ImRaii.TabItem("Settings"))
+        {
+            if (cfg)
+                Plugin.Config.LastUsedOptions.Draw();
+        }
     }
 
     [Flags]

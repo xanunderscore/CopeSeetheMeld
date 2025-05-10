@@ -1,4 +1,5 @@
 using Dalamud.Interface;
+using Dalamud.Interface.Components;
 using Dalamud.Interface.Textures.TextureWraps;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
@@ -17,7 +18,7 @@ internal class MeldUI : IDisposable
     private readonly UldWrapper materiaUld = Plugin.PluginInterface.UiBuilder.LoadUld("ui/uld/ItemDetail.uld");
     private readonly ReadOnlyCollection<IDalamudTextureWrap?> materiaIcons;
     private readonly MeldOptions meldOptions = Config.LastUsedOptions;
-    private Automation auto;
+    private readonly Automation auto;
 
     private bool popupOpen;
     private MeldLog? meldLog;
@@ -40,132 +41,126 @@ internal class MeldUI : IDisposable
 
     public void Draw()
     {
-        var ctrl = ImGui.GetIO().KeyCtrl;
-
-        if (ImGui.Button("Import from clipboard"))
-        {
-            Plugin.Log.Debug($"importing {ImGui.GetClipboardText()}");
-            auto.Start(new Import.Import(ImGui.GetClipboardText()));
-        }
-
-        ImGui.SameLine();
-        using (ImRaii.PushFont(UiBuilder.IconFont))
-            ImGui.TextUnformatted(FontAwesomeIcon.InfoCircle.ToIconString());
-
-        if (ImGui.IsItemHovered())
-            ImGui.SetTooltip($"xivgear.app URL, etro.gg URL, or Teamcraft \"Copy gearset to clipboard\"");
-
-        using (ImRaii.Disabled(!ctrl))
-            if (ImGui.Button("Delete all saved gearsets (hold CTRL)"))
-            {
-                Config.Gearsets.Clear();
-                Config.SelectedGearset = null;
-            }
-
-        ImGui.Spacing();
-        ImGui.Separator();
         ImGui.Spacing();
 
-        using (ImRaii.Child("Left", new Vector2(150 * ImGuiHelpers.GlobalScale, -1)))
+        using (ImRaii.Child("Left", new Vector2(250 * ImGuiHelpers.GlobalScale, -1)))
             DrawSidebar();
 
         ImGui.SameLine();
 
         using (ImRaii.Child("Right", new Vector2(-1, -1), false, ImGuiWindowFlags.NoSavedSettings))
-            if (Config.SelectedGearset is string s && Config.Gearsets.TryGetValue(s, out var gearset))
-                DrawGearset(gearset);
+            if (Config.GetSelected() is { } gs)
+                DrawGearset(Config.SelectedIndex, gs);
     }
 
-    private static void DrawSidebar()
+    private void DrawSidebar()
     {
-        foreach (var g in Config.Gearsets.Keys)
-            if (ImGui.Selectable(g, g == Config.SelectedGearset))
-                Config.SelectedGearset = Config.SelectedGearset == g ? null : g;
-    }
+        var ctrl = ImGui.GetIO().KeyCtrl;
 
-    private void DrawGearset(Gearset gs)
-    {
-        var rename = gs.Name;
-        if (ImGui.InputText("Name", ref rename, 255, ImGuiInputTextFlags.EnterReturnsTrue))
+        if (ImGuiComponents.IconButton(FontAwesomeIcon.FileImport))
         {
-            var oldName = gs.Name;
-            gs.Name = rename;
-            Config.Gearsets.Add(rename, gs);
-            Config.Gearsets.Remove(oldName);
-            Config.SelectedGearset = rename;
+            Plugin.Log.Debug($"importing {ImGui.GetClipboardText()}");
+            auto.Start(new Import.Import(ImGui.GetClipboardText()));
         }
 
-        using (ImRaii.Disabled(!ImGui.GetIO().KeyCtrl))
-            if (ImGui.Button("Delete this gearset (hold CTRL)"))
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip($"xivgear.app URL, etro.gg URL, or Teamcraft \"Copy gearset to clipboard\"");
+
+        ImGui.SameLine();
+
+        using (ImRaii.Disabled(!ctrl || Config.SelectedIndex == -1))
+            if (ImGuiComponents.IconButton(FontAwesomeIcon.Trash))
             {
-                Config.Gearsets.Remove(gs.Name);
-                Config.SelectedGearset = null;
+                Config.GearsetList.RemoveAt(Config.SelectedIndex);
+                Config.SelectedIndex = -1;
             }
 
-        ImGui.BeginTable("items", 4, ImGuiTableFlags.NoBordersInBody | ImGuiTableFlags.SizingStretchProp);
-        ImGui.TableSetupColumn("###iconsleft", ImGuiTableColumnFlags.WidthFixed);
-        ImGui.TableSetupColumn("###textleft");
-        ImGui.TableSetupColumn("###iconsright", ImGuiTableColumnFlags.WidthFixed);
-        ImGui.TableSetupColumn("###textright");
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Delete selected gearset (hold CTRL)");
 
-        ImGui.TableNextRow(ImGuiTableRowFlags.None, 80);
-        DrawItemSlot(gs[ItemType.Weapon]);
-        DrawItemSlot(gs[ItemType.Offhand]);
+        ImGui.Spacing();
+        ImGui.Separator();
+        ImGui.Spacing();
 
-        ImGui.TableNextRow(ImGuiTableRowFlags.None, 80);
-        DrawItemSlot(gs[ItemType.Head]);
-        DrawItemSlot(gs[ItemType.Ears]);
+        for (var i = 0; i < Config.GearsetList.Count; i++)
+            if (ImGui.Selectable(Config.GearsetList[i].Name, Config.SelectedIndex == i))
+            {
+                meldLog = null;
+                Config.SelectedIndex = Config.SelectedIndex == i ? -1 : i;
+            }
+    }
 
-        ImGui.TableNextRow(ImGuiTableRowFlags.None, 80);
-        DrawItemSlot(gs[ItemType.Body]);
-        DrawItemSlot(gs[ItemType.Neck]);
+    private void DrawGearset(int index, Gearset gs)
+    {
+        DrawLogsPopup();
+        DrawConfigurePopup();
 
-        ImGui.TableNextRow(ImGuiTableRowFlags.None, 80);
-        DrawItemSlot(gs[ItemType.Hands]);
-        DrawItemSlot(gs[ItemType.Wrists]);
+        var rename = gs.Name;
+        if (ImGui.InputText("Name", ref rename, 255, ImGuiInputTextFlags.EnterReturnsTrue))
+            Config.Rename(index, rename);
 
-        ImGui.TableNextRow(ImGuiTableRowFlags.None, 80);
-        DrawItemSlot(gs[ItemType.Legs]);
-        DrawItemSlot(gs[ItemType.RingL]);
+        ImGui.Dummy(new(0, 12));
 
-        ImGui.TableNextRow(ImGuiTableRowFlags.None, 80);
-        DrawItemSlot(gs[ItemType.Feet]);
-        DrawItemSlot(gs[ItemType.RingR]);
-
-        ImGui.EndTable();
-
-        meldOptions.Draw();
+        if (ImGui.Button("Add DoH/DoL tools for other jobs"))
+        {
+            gs.Items.AddRange(Data.GetMissingTools(gs));
+            gs.Sort();
+        }
 
         using (ImRaii.Disabled(Game.PlayerIsBusy))
-            if (ImGui.Button("Go!"))
+            if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Play, "Meld!"))
             {
                 Plugin.Config.LastUsedOptions = meldOptions;
                 meldLog = new();
                 auto.Start(new Meld(gs, meldOptions, meldLog));
             }
 
+        if (ImGui.IsItemHovered() && meldOptions.DryRun)
+            ImGui.SetTooltip("Dry Run mode is active, so melds will only be logged, not actually performed.");
+
+        ImGui.SameLine();
+
+        if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Cog, "Options"))
+            ImGui.OpenPopup("Meld options");
+
         if (auto.LastError is { } e)
             foreach (var inner in e.InnerExceptions)
                 ImGui.TextUnformatted(inner.Message);
 
-        if (meldLog is { Done: true } && ImGui.Button("Show log"))
+        if (meldLog is { Done: true })
         {
-            popupOpen = true;
-            ImGui.OpenPopup("###showlog");
+            if (ImGui.Button("Show log"))
+            {
+                popupOpen = true;
+                ImGui.OpenPopup("###showlog");
+            }
+            ImGui.SameLine();
+            if (ImGui.Button("Clear log"))
+            {
+                meldLog = null;
+            }
         }
 
-        DrawLogsPopup();
+        ImGui.Dummy(new(0, 12));
+
+        ImGui.BeginTable("items", 3, ImGuiTableFlags.NoBordersInBody | ImGuiTableFlags.SizingStretchProp);
+        ImGui.TableSetupColumn("###icons", ImGuiTableColumnFlags.WidthFixed);
+        ImGui.TableSetupColumn("###text");
+        ImGui.TableSetupColumn("###materia");
+
+        foreach (var item in gs.Items)
+            DrawItemSlot(item);
+
+        ImGui.EndTable();
     }
 
     private void DrawItemSlot(ItemSlot slot)
     {
-        ImGui.TableNextColumn();
-
         if (slot.Id == 0)
-        {
-            ImGui.TableNextColumn();
             return;
-        }
+
+        ImGui.TableNextRow(ImGuiTableRowFlags.None, 44);
+        ImGui.TableNextColumn();
         var it = Data.Item(slot.Id);
 
         var maxSlots = it.MateriaSlotCount;
@@ -175,7 +170,7 @@ internal class MeldUI : IDisposable
         ImGui.TableNextColumn();
         ImGui.Text(it.Name.ToString());
 
-        ImGui.Text("");
+        ImGui.TableNextColumn();
 
         using (ImRaii.PushStyle(ImGuiStyleVar.ItemSpacing, new Vector2(0, 0)))
             foreach (var (i, m) in Enumerable.Range(1, 5).Zip(slot.Materia))
@@ -197,8 +192,8 @@ internal class MeldUI : IDisposable
 
         if (materiaIcons[grade] is IDalamudTextureWrap t)
         {
-            ImGui.SameLine();
             ImGui.Image(t.ImGuiHandle, new(32, 32));
+            ImGui.SameLine();
 
             if (ImGui.IsItemHovered())
                 ImGui.SetTooltip($"{Data.ItemName(itemId)} ({materia})");
@@ -248,5 +243,14 @@ internal class MeldUI : IDisposable
 
         if (ImGui.Button("Close"))
             ImGui.CloseCurrentPopup();
+    }
+
+    private void DrawConfigurePopup()
+    {
+        using var popup = ImRaii.Popup("Meld options");
+        if (!popup.Success)
+            return;
+
+        meldOptions.Draw();
     }
 }

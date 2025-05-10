@@ -19,6 +19,8 @@ public partial class Import(string input) : AutoTask
 
     protected override async Task Execute()
     {
+        using var _ = new OnDispose(Plugin.Config.Save);
+
         // teamcraft export is just markdown
         if (input.StartsWith("**"))
         {

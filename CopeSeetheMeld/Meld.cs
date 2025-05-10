@@ -24,7 +24,7 @@ public class Meld(Gearset goal, MeldOptions opts, MeldLog? log) : AutoTask
         });
 
         List<ItemRef> foundItems = [];
-        foreach (var (itemSlot, desiredItem) in goal.Slots)
+        foreach (var (itemSlot, desiredItem) in goal.EnumerateItems())
         {
             var currentItem = FindItem(desiredItem, itemSlot, foundItems);
             if (currentItem == null)
@@ -71,7 +71,7 @@ public class Meld(Gearset goal, MeldOptions opts, MeldLog? log) : AutoTask
             ItemType.Ears => InventoryType.ArmoryEar,
             ItemType.Neck => InventoryType.ArmoryNeck,
             ItemType.Wrists => InventoryType.ArmoryWrist,
-            ItemType.RingL or ItemType.RingR => InventoryType.ArmoryRings,
+            ItemType.Ring => InventoryType.ArmoryRings,
             _ => InventoryType.Invalid
         };
     }
@@ -203,7 +203,7 @@ public class Meld(Gearset goal, MeldOptions opts, MeldLog? log) : AutoTask
             return false;
         }
 
-        // do regular melds
+        // do actual melds
         foreach (var m in wantDict.SelectMany(k => Enumerable.Repeat(k.Key, k.Value)))
             await MeldOne(have, m);
 
