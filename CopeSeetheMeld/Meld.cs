@@ -130,7 +130,7 @@ public class Meld(Gearset goal, MeldOptions opts, MeldLog? log) : AutoTask
             var curMateria = have.GetMateria(slot);
             var wantMateria = wantMat[slot];
 
-            if (curMateria != wantMateria)
+            if (!Satisfies(curMateria, wantMateria))
             {
                 if (!opts.Overmeld)
                 {
@@ -185,7 +185,7 @@ public class Meld(Gearset goal, MeldOptions opts, MeldLog? log) : AutoTask
         if (haveMat.Count > normalSlotCount)
         {
             for (var i = normalSlotCount; i < haveMat.Count; i++)
-                if (wantMat[i] != haveMat[i])
+                if (!Satisfies(haveMat[i], wantMat[i]))
                 {
                     if (opts.Mode == MeldOptions.SpecialMode.MeldOnly)
                     {
@@ -209,6 +209,8 @@ public class Meld(Gearset goal, MeldOptions opts, MeldLog? log) : AutoTask
 
         return true;
     }
+
+    public bool Satisfies(Mat actual, Mat desired) => actual.Id == desired.Id && actual.Grade >= desired.Grade;
 
     private async Task MeldOne(ItemRef foundItem, Mat m, int overmeldSlot = -1)
     {
