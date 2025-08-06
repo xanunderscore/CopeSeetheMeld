@@ -29,8 +29,11 @@ public class Meld(Gearset goal, MeldOptions opts, MeldLog? log) : AutoTask
             var currentItem = FindItem(desiredItem, itemSlot, foundItems);
             if (currentItem == null)
             {
+                var exc = new ItemNotFoundException(desiredItem.Id, desiredItem.HighQuality);
                 if (opts.StopOnMissingItem == MeldOptions.StopBehavior.Stop)
-                    throw new ItemNotFoundException(desiredItem.Id, desiredItem.HighQuality);
+                    throw exc;
+
+                log?.Report(exc.Message);
 
                 continue;
             }
@@ -41,6 +44,12 @@ public class Meld(Gearset goal, MeldOptions opts, MeldLog? log) : AutoTask
                 await MeldItem(desiredItem, currentItem);
             }
             catch (MateriaNotFoundException m)
+            {
+                log?.ReportError(m);
+                if (opts.StopOnMissingMateria == MeldOptions.StopBehavior.Stop)
+                    throw;
+            }
+            catch (MeldFailedException m)
             {
                 log?.ReportError(m);
                 if (opts.StopOnMissingMateria == MeldOptions.StopBehavior.Stop)
@@ -168,11 +177,16 @@ public class Meld(Gearset goal, MeldOptions opts, MeldLog? log) : AutoTask
                 if (wantDict[cur] == 0)
                     wantDict.Remove(cur);
             }
+            else if (i >= wantMat.Count)
+            {
+                Log($"Skipping slot {i} on {have} because it's empty in the gearset");
+                break;
+            }
             else
             {
                 if (opts.Mode == MeldOptions.SpecialMode.MeldOnly)
                 {
-                    Log($"Retrieval needed for slot {i}");
+                    Log($"Retrieval needed for slot {i} of {have}; replacing {haveMat[i]} with {wantMat[i]}");
                     return false;
                 }
 
@@ -182,19 +196,23 @@ public class Meld(Gearset goal, MeldOptions opts, MeldLog? log) : AutoTask
             }
         }
 
-        if (haveMat.Count > normalSlotCount)
+        for (var i = normalSlotCount; i < haveMat.Count; i++)
         {
-            for (var i = normalSlotCount; i < haveMat.Count; i++)
-                if (!Satisfies(haveMat[i], wantMat[i]))
+            if (i >= wantMat.Count)
+            {
+                Log($"Skipping slot {i} on {have} because it's empty in the gearset");
+                break;
+            }
+            else if (!Satisfies(haveMat[i], wantMat[i]))
+            {
+                if (opts.Mode == MeldOptions.SpecialMode.MeldOnly)
                 {
-                    if (opts.Mode == MeldOptions.SpecialMode.MeldOnly)
-                    {
-                        Log($"Retrieval needed for slot {i}");
-                        return false;
-                    }
-                    await EnsureSlotEmpty(have, i);
-                    break;
+                    Log($"Retrieval needed for slot {i} of {have}");
+                    return false;
                 }
+                await EnsureSlotEmpty(have, i);
+                break;
+            }
         }
 
         if (opts.Mode == MeldOptions.SpecialMode.RetrieveOnly)
@@ -293,7 +311,8 @@ public class Meld(Gearset goal, MeldOptions opts, MeldLog? log) : AutoTask
     }
     public class MeldFailedException(ItemRef i, Mat mat) : Exception
     {
-        public override string Message => $"Ran out of materia while trying to attach {mat} to {i}.";
+        public string ItemDescription { get; init; } = i.ToString();
+        public override string Message => $"Ran out of materia while trying to attach {mat} to {ItemDescription}.";
     }
 
     protected async Task OpenAgent()

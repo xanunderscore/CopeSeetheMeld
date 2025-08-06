@@ -1,8 +1,7 @@
 using CopeSeetheMeld.UI;
-using Dalamud.Interface;
+using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Utility.Raii;
 using FFXIVClientStructs.FFXIV.Client.Game;
-using ImGuiNET;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -35,17 +34,11 @@ public class MeldOptions
     public int MeldConfidence = 50;
     public StopBehavior StopOnMissingItem = StopBehavior.Skip;
     public StopBehavior StopOnMissingMateria = StopBehavior.Skip;
+    public StopBehavior StopOnOvermeldFail = StopBehavior.Stop;
     public SpecialMode Mode = SpecialMode.None;
 
     public void Draw()
     {
-        ImGui.Checkbox("Dry run", ref DryRun);
-        ImGui.SameLine();
-        using (ImRaii.PushFont(UiBuilder.IconFont))
-            ImGui.Text(FontAwesomeIcon.InfoCircle.ToIconString());
-        if (ImGui.IsItemHovered())
-            ImGui.SetTooltip($"Don't do any melds - just output what changes would be made given current gear.");
-
         EnumCombo("Mode", ref Mode);
 
         EnumCombo("If an item is missing", ref StopOnMissingItem);
@@ -53,6 +46,8 @@ public class MeldOptions
         {
             EnumCombo("If materia is missing", ref StopOnMissingMateria);
             ImGui.Checkbox("Do overmelds", ref Overmeld);
+            using (ImRaii.Disabled(!Overmeld))
+                EnumCombo("If overmeld fails", ref StopOnOvermeldFail);
         }
         using (ImRaii.Disabled(!Overmeld))
         {
@@ -91,7 +86,18 @@ public class MeldLog
     public readonly List<string> Actions = [];
     public readonly Dictionary<Mat, int> MateriaUsed = [];
     public readonly Dictionary<Mat, int> MateriaNeeded = [];
+    public readonly Dictionary<MateriaCost, int> FundsNeeded = [];
     public bool Done;
+    public bool Counted;
+
+    public enum MateriaCost
+    {
+        Unknown,
+        CraftPurple,
+        CraftOrange,
+        GatherPurple,
+        GatherOrange
+    }
 
     public void Report(string msg) => Actions.Add(msg);
     public void ReportError(Exception ex) => Actions.Add(ex.Message);
@@ -108,11 +114,54 @@ public class MeldLog
 
     public unsafe void Count()
     {
+        if (Counted)
+            return;
+        Counted = true;
         foreach (var (m, c) in MateriaUsed)
         {
             var needed = c - InventoryManager.Instance()->GetInventoryItemCount(m.Item.RowId, false, checkEquipped: false, checkArmory: false);
             if (needed > 0)
+            {
                 MateriaNeeded[m] = needed;
+                var (costType, costVal) = GetCost(m);
+                if (costVal > 0)
+                {
+                    FundsNeeded.TryAdd(costType, 0);
+                    FundsNeeded[costType] += costVal * needed;
+                }
+            }
         }
+    }
+
+    private static (MateriaCost, int) GetCost(Mat m)
+    {
+        var humanGrade = m.Grade + 1;
+
+        if (m.Row.BaseParam.RowId is 11 or 70 or 71)
+        {
+            return humanGrade switch
+            {
+                12 => (MateriaCost.CraftOrange, 500),
+                > 9 => (MateriaCost.CraftPurple, 250),
+                > 4 => (MateriaCost.CraftPurple, 200),
+                4 => (MateriaCost.CraftPurple, 25),
+                _ => default
+            };
+        }
+
+        // gathering
+        if (m.Row.BaseParam.RowId is 10 or 72 or 73)
+        {
+            return humanGrade switch
+            {
+                12 => (MateriaCost.GatherOrange, 500),
+                > 9 => (MateriaCost.GatherPurple, 250),
+                > 4 => (MateriaCost.GatherPurple, 200),
+                4 => (MateriaCost.GatherPurple, 25),
+                _ => default
+            };
+        }
+
+        return default;
     }
 }

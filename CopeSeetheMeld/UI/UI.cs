@@ -1,4 +1,4 @@
-using ImGuiNET;
+using Dalamud.Bindings.ImGui;
 using Lumina.Excel.Sheets;
 using System;
 
@@ -9,7 +9,7 @@ public static class UI
     public static void Draw(Item item, bool hq = false)
     {
         var ic = Plugin.TextureProvider.GetFromGameIcon(new(item.Icon, hq)).GetWrapOrEmpty();
-        ImGui.Image(ic.ImGuiHandle, new(32, 32));
+        ImGui.Image(ic.Handle, new(32, 32));
     }
 }
 

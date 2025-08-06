@@ -1,9 +1,9 @@
+using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
 using Dalamud.Interface.Components;
 using Dalamud.Interface.Textures.TextureWraps;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
-using ImGuiNET;
 using System;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -107,21 +107,25 @@ internal class MeldUI : IDisposable
             gs.Sort();
         }
 
+        ImGui.SameLine();
+        if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Cog, "Options"))
+            ImGui.OpenPopup("Meld options");
+
         using (ImRaii.Disabled(Game.PlayerIsBusy && !meldOptions.DryRun))
-            if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Play, "Meld!"))
+            if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Play, "Meld"))
             {
                 Plugin.Config.LastUsedOptions = meldOptions;
                 meldLog = new();
                 auto.Start(new Meld(gs, meldOptions, meldLog));
             }
 
-        if (ImGui.IsItemHovered() && meldOptions.DryRun)
-            ImGui.SetTooltip("Dry Run mode is active, so melds will only be logged, not actually performed.");
-
         ImGui.SameLine();
-
-        if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Cog, "Options"))
-            ImGui.OpenPopup("Meld options");
+        ImGui.Checkbox("Dry run", ref meldOptions.DryRun);
+        ImGui.SameLine();
+        using (ImRaii.PushFont(UiBuilder.IconFont))
+            ImGui.Text(FontAwesomeIcon.InfoCircle.ToIconString());
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip($"Don't do any melds - just output what changes would be made given current gear.");
 
         if (auto.LastError is { } e)
             foreach (var inner in e.InnerExceptions)
@@ -193,7 +197,7 @@ internal class MeldUI : IDisposable
 
         if (materiaIcons[grade] is IDalamudTextureWrap t)
         {
-            ImGui.Image(t.ImGuiHandle, new(32, 32));
+            ImGui.Image(t.Handle, new(32, 32));
             ImGui.SameLine();
 
             if (ImGui.IsItemHovered())
@@ -224,14 +228,13 @@ internal class MeldUI : IDisposable
             ImGui.TableSetupColumn("Missing", ImGuiTableColumnFlags.WidthFixed, 100);
             ImGui.TableHeadersRow();
 
-
             foreach (var (m, cnt) in materiaOrdered)
             {
                 ImGui.TableNextRow();
                 ImGui.TableNextColumn();
-                ImGui.TextUnformatted($"{m.Item.Name}");
+                ImGui.TextUnformatted(m.Item.Name.ToString());
                 ImGui.TableNextColumn();
-                ImGui.TextUnformatted($"{cnt}");
+                ImGui.TextUnformatted(cnt.ToString());
                 ImGui.TableNextColumn();
                 if (meldLog.MateriaNeeded.TryGetValue(m, out var n))
                     ImGui.TextUnformatted(n.ToString());
@@ -239,6 +242,10 @@ internal class MeldUI : IDisposable
                     ImGui.TextUnformatted("-");
             }
         }
+
+        foreach (var (c, i) in meldLog.FundsNeeded)
+            if (i > 0)
+                ImGui.TextUnformatted($"Needed: {c} {i}");
 
         if (ImGui.Button("Copy materia to clipboard"))
         {
