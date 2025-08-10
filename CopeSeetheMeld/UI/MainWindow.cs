@@ -1,3 +1,4 @@
+using CopeSeetheMeld.Tasks;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
@@ -69,16 +70,7 @@ public partial class MainWindow : Window, IDisposable
         }
     }
 
-    [Flags]
-    private enum RetrieveCategory
-    {
-        None = 0,
-        Equipped = 1,
-        Inventory = 2,
-        Armoury = 4
-    }
-
-    private RetrieveCategory retrieveCategory;
+    private Source retrieveSources;
 
     private void DrawUtils()
     {
@@ -86,25 +78,26 @@ public partial class MainWindow : Window, IDisposable
         ImGui.Separator();
         ImGui.AlignTextToFramePadding();
         ImGui.Text("Sources: ");
-        DrawButton("Equipped", RetrieveCategory.Equipped);
-        DrawButton("Inventory", RetrieveCategory.Inventory);
-        DrawButton("Armoury", RetrieveCategory.Armoury);
-        if (ImGui.Button("Retrieve all"))
-            Plugin.Log.Debug("retrieve");
+        DrawButton("Equipped", Source.Equipped);
+        DrawButton("Inventory", Source.Inventory);
+        DrawButton("Armoury", Source.Armoury);
+        using (ImRaii.Disabled(retrieveSources == default))
+            if (ImGui.Button("Retrieve all"))
+                auto.Start(new Retrieve(retrieveSources));
     }
 
-    private void DrawButton(string label, RetrieveCategory flag)
+    private void DrawButton(string label, Source flag)
     {
-        var active = retrieveCategory.HasFlag(flag);
+        var active = retrieveSources.HasFlag(flag);
 
         ImGui.SameLine();
         using (ImRaii.PushColor(ImGuiCol.Button, 0xFF008080, active))
             if (ImGui.Button(label))
             {
                 if (active)
-                    retrieveCategory &= ~flag;
+                    retrieveSources &= ~flag;
                 else
-                    retrieveCategory |= flag;
+                    retrieveSources |= flag;
             }
     }
 }

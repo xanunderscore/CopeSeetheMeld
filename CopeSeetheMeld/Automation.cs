@@ -109,21 +109,28 @@ public sealed class Automation : IDisposable
 
     public void Dispose() => Stop();
 
+    private HashSet<string>? yesAlreadyBlock;
+
     // stop executing any running task
     // this requires tasks to cooperate by checking the token
     public void Stop()
     {
         CurrentTask?.Cancel();
         CurrentTask = null;
+        yesAlreadyBlock?.Remove("CSM");
     }
 
     // if any other task is running, it's cancelled
     public void Start(AutoTask task)
     {
+        if (yesAlreadyBlock == null)
+            Plugin.PluginInterface.TryGetData("YesAlready.StopRequests", out yesAlreadyBlock);
         Stop();
         CurrentTask = task;
+        yesAlreadyBlock?.Add("CSM");
         task.Run((exc) =>
         {
+            yesAlreadyBlock?.Remove("CSM");
             LastError = exc;
             if (CurrentTask == task)
                 CurrentTask = null;
