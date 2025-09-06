@@ -98,7 +98,10 @@ internal class MeldUI : IDisposable
 
         var rename = gs.Name;
         if (ImGui.InputText("Name", ref rename, 255, ImGuiInputTextFlags.EnterReturnsTrue))
+        {
             Config.Rename(index, rename);
+            Config.Save();
+        }
 
         ImGui.Dummy(new(0, 12));
 
@@ -106,6 +109,7 @@ internal class MeldUI : IDisposable
         {
             gs.Items.AddRange(Data.GetMissingTools(gs));
             gs.Sort();
+            Config.Save();
         }
 
         ImGui.SameLine();
